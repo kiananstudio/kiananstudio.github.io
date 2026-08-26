@@ -31,7 +31,7 @@
       const url = new URL(value);
       if (url.protocol !== 'https:' || url.hostname.toLowerCase() !== 'github.com') return null;
       const parts = url.pathname.split('/').filter(Boolean);
-      if (parts.length < 7 || parts[2] !== 'releases' || parts[3] !== 'download') return null;
+      if (parts.length < 6 || parts[2] !== 'releases' || parts[3] !== 'download') return null;
       const repo = `${parts[0]}/${parts[1]}`;
       if (repository && repo.toLowerCase() !== String(repository).trim().toLowerCase()) return null;
       const filename = decodeURIComponent(parts.slice(5).join('/'));
