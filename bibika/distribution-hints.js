@@ -39,6 +39,14 @@
     document.querySelectorAll('#downloads-editor .download-row').forEach(updateRow);
   }
 
+  function loadReleaseSync() {
+    if (document.getElementById('bibika-release-sync-script')) return;
+    const script = document.createElement('script');
+    script.id = 'bibika-release-sync-script';
+    script.src = '/release-sync.js?v=1';
+    document.head.appendChild(script);
+  }
+
   window.addEventListener('DOMContentLoaded', () => {
     const editor = document.getElementById('downloads-editor');
     if (!editor) return;
@@ -54,4 +62,6 @@
 
     updateAll();
   });
+
+  loadReleaseSync();
 })();
