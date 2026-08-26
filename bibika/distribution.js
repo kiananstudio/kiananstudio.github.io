@@ -10,12 +10,68 @@
     other: 'Другая платформа'
   };
 
+  const platformConfigs = {
+    windows: {
+      showArchitecture: true,
+      architectures: [
+        ['', 'Не указана'],
+        ['x64', 'x64'],
+        ['arm64', 'ARM64'],
+        ['x86', 'x86']
+      ],
+      requirementLabel: 'Минимальная Windows',
+      requirementPlaceholder: 'Windows 10',
+      requirementHint: 'Минимальная поддерживаемая версия Windows.',
+      buttonPlaceholder: 'Скачать для Windows'
+    },
+    macos: {
+      showArchitecture: true,
+      architectures: [
+        ['universal', 'Universal'],
+        ['arm64', 'Apple Silicon (ARM64)'],
+        ['x64', 'Intel (x64)']
+      ],
+      requirementLabel: 'Минимальная macOS',
+      requirementPlaceholder: 'macOS 12',
+      requirementHint: 'Минимальная поддерживаемая версия macOS.',
+      buttonPlaceholder: 'Скачать для macOS'
+    },
+    android: {
+      showArchitecture: false,
+      architectures: [['', 'Не используется']],
+      requirementLabel: 'Минимальная версия Android',
+      requirementPlaceholder: 'Android 8.0',
+      requirementHint: 'Обычно достаточно одного APK: укажи минимальную версию Android, с которой работает сборка.',
+      buttonPlaceholder: 'Скачать APK для Android'
+    },
+    linux: {
+      showArchitecture: true,
+      architectures: [
+        ['', 'Не указана'],
+        ['x64', 'x64'],
+        ['arm64', 'ARM64']
+      ],
+      requirementLabel: 'Системные требования',
+      requirementPlaceholder: 'Ubuntu 22.04+ / compatible',
+      requirementHint: 'Для Linux лучше указывать дистрибутив или минимальные системные требования.',
+      buttonPlaceholder: 'Скачать для Linux'
+    },
+    other: {
+      showArchitecture: false,
+      architectures: [['', 'Не используется']],
+      requirementLabel: 'Системные требования',
+      requirementPlaceholder: 'Укажи требования к системе',
+      requirementHint: 'Необязательное поле.',
+      buttonPlaceholder: 'Скачать'
+    }
+  };
+
   function ensureStylesheet() {
     if (document.getElementById(STYLE_ID)) return;
     const link = document.createElement('link');
     link.id = STYLE_ID;
     link.rel = 'stylesheet';
-    link.href = '/distribution.css?v=1';
+    link.href = '/distribution.css?v=2';
     document.head.appendChild(link);
   }
 
@@ -27,10 +83,46 @@
       .replaceAll('>', '&gt;');
   }
 
+  function architectureOptions(platform, selectedValue = '') {
+    const config = platformConfigs[platform] || platformConfigs.other;
+    const values = new Set(config.architectures.map(([value]) => value));
+    const options = [...config.architectures];
+    if (selectedValue && !values.has(selectedValue)) options.push([selectedValue, selectedValue]);
+    return options
+      .map(([value, label]) => `<option value="${escapeAttr(value)}"${selectedValue === value ? ' selected' : ''}>${escapeAttr(label)}</option>`)
+      .join('');
+  }
+
+  function updateDownloadRowForPlatform(row, { preserveArchitecture = true } = {}) {
+    if (!row) return;
+    const platform = row.querySelector('.download-platform')?.value || 'other';
+    const config = platformConfigs[platform] || platformConfigs.other;
+    const architectureField = row.querySelector('.download-architecture-field');
+    const architectureSelect = row.querySelector('.download-architecture');
+    const oldArchitecture = preserveArchitecture ? (architectureSelect?.value || '') : '';
+
+    if (architectureSelect) {
+      architectureSelect.innerHTML = architectureOptions(platform, oldArchitecture);
+      if (!config.showArchitecture) architectureSelect.value = '';
+    }
+    if (architectureField) architectureField.hidden = !config.showArchitecture;
+
+    const requirementLabel = row.querySelector('.download-requirement-label');
+    const requirementInput = row.querySelector('.download-requirement');
+    const requirementHint = row.querySelector('.download-requirement-hint');
+    const labelInput = row.querySelector('.download-label');
+
+    if (requirementLabel) requirementLabel.textContent = config.requirementLabel;
+    if (requirementInput) requirementInput.placeholder = config.requirementPlaceholder;
+    if (requirementHint) requirementHint.textContent = config.requirementHint;
+    if (labelInput) labelInput.placeholder = `${config.buttonPlaceholder} — необязательно`;
+  }
+
   function addDownloadRow(download = {}) {
     const list = document.getElementById('downloads-editor');
     if (!list) return;
 
+    const platform = platformNames[download.platform] ? download.platform : 'windows';
     const row = document.createElement('div');
     row.className = 'download-row';
     row.innerHTML = `
@@ -38,28 +130,27 @@
         <label class="field download-field">
           <span>Платформа</span>
           <select class="download-platform">
-            ${Object.entries(platformNames).map(([value, label]) => `<option value="${value}"${download.platform === value ? ' selected' : ''}>${label}</option>`).join('')}
+            ${Object.entries(platformNames).map(([value, label]) => `<option value="${value}"${platform === value ? ' selected' : ''}>${label}</option>`).join('')}
           </select>
         </label>
-        <label class="field download-field">
+        <label class="field download-field download-architecture-field">
           <span>Архитектура</span>
-          <select class="download-architecture">
-            <option value=""${!download.architecture ? ' selected' : ''}>Не указана</option>
-            <option value="x64"${download.architecture === 'x64' ? ' selected' : ''}>x64</option>
-            <option value="arm64"${download.architecture === 'arm64' ? ' selected' : ''}>ARM64</option>
-            <option value="universal"${download.architecture === 'universal' ? ' selected' : ''}>Universal</option>
-            <option value="x86"${download.architecture === 'x86' ? ' selected' : ''}>x86</option>
-            <option value="other"${download.architecture === 'other' ? ' selected' : ''}>Другая</option>
-          </select>
+          <select class="download-architecture"></select>
+        </label>
+        <label class="field download-field download-requirement-field">
+          <span class="download-requirement-label">Системные требования</span>
+          <input class="download-requirement" value="${escapeAttr(download.requirements || download.minOs || '')}">
+          <small class="download-requirement-hint"></small>
         </label>
         <label class="field download-field">
-          <span>Версия</span>
+          <span>Версия приложения</span>
           <input class="download-version" placeholder="1.0.0" value="${escapeAttr(download.version || '')}">
         </label>
       </div>
       <label class="field">
-        <span>Название кнопки</span>
-        <input class="download-label" placeholder="Скачать для Windows" value="${escapeAttr(download.label || '')}">
+        <span>Название кнопки <small class="inline-optional">необязательно</small></span>
+        <input class="download-label" value="${escapeAttr(download.label || '')}">
+        <small>Если оставить пустым, сайт сам сформирует название кнопки по выбранной платформе.</small>
       </label>
       <label class="field">
         <span>Ссылка на файл в GitHub Releases</span>
@@ -71,7 +162,15 @@
         <button type="button" class="btn btn-small btn-ghost move-download-down" title="Переместить ниже">↓ Ниже</button>
         <button type="button" class="btn btn-small btn-danger remove-download">Удалить</button>
       </div>`;
+
     list.appendChild(row);
+    const architectureSelect = row.querySelector('.download-architecture');
+    if (architectureSelect) architectureSelect.dataset.initialValue = download.architecture || '';
+    updateDownloadRowForPlatform(row, { preserveArchitecture: false });
+    if (architectureSelect && (platformConfigs[platform] || platformConfigs.other).showArchitecture) {
+      architectureSelect.innerHTML = architectureOptions(platform, download.architecture || '');
+      architectureSelect.value = download.architecture || architectureSelect.options[0]?.value || '';
+    }
   }
 
   function fillDownloads(downloads = []) {
@@ -145,6 +244,10 @@
     });
 
     document.getElementById('add-download').addEventListener('click', () => addDownloadRow());
+    document.getElementById('downloads-editor').addEventListener('change', (event) => {
+      if (!event.target.matches('.download-platform')) return;
+      updateDownloadRowForPlatform(event.target.closest('.download-row'), { preserveArchitecture: false });
+    });
     document.getElementById('downloads-editor').addEventListener('click', (event) => {
       const row = event.target.closest('.download-row');
       if (!row) return;
@@ -156,14 +259,19 @@
 
   function collectDownloads() {
     return [...document.querySelectorAll('#downloads-editor .download-row')]
-      .map((row) => ({
-        platform: row.querySelector('.download-platform')?.value || 'other',
-        architecture: row.querySelector('.download-architecture')?.value || '',
-        version: row.querySelector('.download-version')?.value.trim() || '',
-        label: row.querySelector('.download-label')?.value.trim() || '',
-        url: row.querySelector('.download-url')?.value.trim() || ''
-      }))
-      .filter((item) => item.url || item.label || item.version);
+      .map((row) => {
+        const platform = row.querySelector('.download-platform')?.value || 'other';
+        const config = platformConfigs[platform] || platformConfigs.other;
+        return {
+          platform,
+          architecture: config.showArchitecture ? (row.querySelector('.download-architecture')?.value || '') : '',
+          requirements: row.querySelector('.download-requirement')?.value.trim() || '',
+          version: row.querySelector('.download-version')?.value.trim() || '',
+          label: row.querySelector('.download-label')?.value.trim() || '',
+          url: row.querySelector('.download-url')?.value.trim() || ''
+        };
+      })
+      .filter((item) => item.url || item.label || item.version || item.requirements);
   }
 
   function installAppPatches() {
@@ -192,9 +300,7 @@
         downloads: type === 'github-releases' ? collectDownloads() : []
       };
 
-      if (type === 'none') {
-        product.links = { primaryLabel: '', primaryUrl: '' };
-      }
+      if (type === 'none') product.links = { primaryLabel: '', primaryUrl: '' };
       return product;
     };
   }
