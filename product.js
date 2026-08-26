@@ -20,6 +20,26 @@
     other: 'Other'
   };
 
+  function architectureName(platform, architecture) {
+    const value = String(architecture || '').toLowerCase();
+    if (!value) return '';
+    if (platform === 'macos') {
+      if (value === 'universal') return 'Universal';
+      if (value === 'arm64') return 'Apple Silicon';
+      if (value === 'x64') return 'Intel x64';
+    }
+    if (value === 'arm64') return 'ARM64';
+    if (value === 'x64') return 'x64';
+    if (value === 'x86') return 'x86';
+    if (value === 'universal') return 'Universal';
+    return architecture;
+  }
+
+  function defaultDownloadLabel(platform) {
+    if (platform === 'android') return 'Download APK for Android';
+    return `Download for ${platformNames[platform] || 'your platform'}`;
+  }
+
   function releaseRepositoryUrl(repository) {
     const value = String(repository || '').trim();
     if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value)) return '';
@@ -84,14 +104,15 @@
         const platform = platformNames[item.platform] || item.platform || 'Download';
         const details = [
           item.version ? `Version ${item.version}` : '',
-          item.architecture || '',
+          architectureName(item.platform, item.architecture),
+          item.requirements || item.minOs || '',
           asset.extension || ''
         ].filter(Boolean).map(escapeHtml).join(' · ');
         return `
           <article class="download-card">
             <div class="download-card-copy">
               <span class="download-platform">${escapeHtml(platform)}</span>
-              <h3>${escapeHtml(item.label || `Download for ${platform}`)}</h3>
+              <h3>${escapeHtml(item.label || defaultDownloadLabel(item.platform))}</h3>
               ${details ? `<p>${details}</p>` : ''}
             </div>
             <a class="button button-primary download-button" href="${escapeHtml(asset.url)}" rel="noopener">Download</a>
