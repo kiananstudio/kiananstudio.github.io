@@ -49,19 +49,18 @@
 
   window.addEventListener('DOMContentLoaded', () => {
     const editor = document.getElementById('downloads-editor');
-    if (!editor) return;
+    if (editor) {
+      editor.addEventListener('change', (event) => {
+        if (event.target.matches('.download-platform')) updateRow(event.target.closest('.download-row'));
+      });
 
-    editor.addEventListener('change', (event) => {
-      if (event.target.matches('.download-platform')) updateRow(event.target.closest('.download-row'));
-    });
+      const observer = new MutationObserver((mutations) => {
+        if (mutations.some((mutation) => mutation.type === 'childList' && mutation.addedNodes.length)) updateAll();
+      });
+      observer.observe(editor, { childList: true });
+      updateAll();
+    }
 
-    const observer = new MutationObserver((mutations) => {
-      if (mutations.some((mutation) => mutation.type === 'childList' && mutation.addedNodes.length)) updateAll();
-    });
-    observer.observe(editor, { childList: true });
-
-    updateAll();
+    loadReleaseSync();
   });
-
-  loadReleaseSync();
 })();
