@@ -31,6 +31,15 @@
     return JSON.parse(JSON.stringify(value));
   }
 
+  function slugify(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 70);
+  }
+
   function setState(message, state = '') {
     const node = q('#category-page-editor-state');
     if (!node) return;
@@ -39,7 +48,9 @@
   }
 
   function productMeta(product) {
-    return [product.version ? `v${product.version}` : '', product.status || ''].filter(Boolean).join(' · ') || product.id;
+    const bits = [product.version ? `v${product.version}` : '', product.status || ''].filter(Boolean);
+    if (product.__new) bits.unshift('Новый');
+    return bits.join(' · ') || product.id;
   }
 
   function renderProductRows() {
@@ -53,6 +64,7 @@
     workingProducts.forEach((product, index) => {
       const row = document.createElement('div');
       row.className = 'category-page-product-row';
+      if (product.__new) row.classList.add('category-page-product-row-new');
       row.dataset.productId = product.id;
       row.innerHTML = `
         <div class="category-page-product-copy"><strong></strong><span></span></div>
@@ -60,7 +72,9 @@
           <button type="button" class="category-page-product-action category-page-product-up" title="Переместить выше">↑</button>
           <button type="button" class="category-page-product-action category-page-product-down" title="Переместить ниже">↓</button>
         </div>
-        <a class="category-page-product-open" href="product.html?id=${encodeURIComponent(product.id)}">Открыть продукт</a>`;
+        ${product.__new
+          ? '<button type="button" class="category-page-product-open category-page-product-open-disabled" disabled title="Сначала сохрани изменения">Сначала сохрани</button>'
+          : `<a class="category-page-product-open" href="product.html?id=${encodeURIComponent(product.id)}">Открыть продукт</a>`}`;
       q('strong', row).textContent = product.title || product.id;
       q('.category-page-product-copy span', row).textContent = productMeta(product);
       q('.category-page-product-up', row).disabled = index === 0;
@@ -83,7 +97,7 @@
           <div>
             <span class="category-page-editor-eyebrow">Редактирование блока</span>
             <h2 id="category-page-editor-title">Category</h2>
-            <p>Настраивай описание страницы и порядок продуктов внутри этой категории.</p>
+            <p>Настраивай описание страницы, добавляй продукты и меняй их порядок.</p>
           </div>
           <button type="button" class="category-page-editor-close" id="category-page-editor-close" aria-label="Закрыть">×</button>
         </div>
@@ -100,11 +114,14 @@
           </section>
           <section class="category-page-editor-section">
             <div class="category-page-products-head">
-              <div><strong>Продукты на странице</strong><span>Стрелками можно изменить их порядок. Сам продукт редактируется на его странице.</span></div>
-              <span>Всего: <b id="category-page-products-count">0</b></span>
+              <div><strong>Продукты на странице</strong><span>Добавляй новые продукты и меняй их порядок. Существующие продукты открываются на своей странице.</span></div>
+              <div class="category-page-products-head-actions">
+                <span>Всего: <b id="category-page-products-count">0</b></span>
+                <button type="button" class="category-page-add-product" id="category-page-add-product">+ Добавить продукт</button>
+              </div>
             </div>
             <div class="category-page-products-list" id="category-page-products-list"></div>
-            <div class="category-page-products-empty" id="category-page-products-empty">В этой категории пока нет продуктов.</div>
+            <div class="category-page-products-empty" id="category-page-products-empty">В этой категории пока нет продуктов. Нажми «+ Добавить продукт».</div>
           </section>
         </div>
         <div class="category-page-editor-footer">
@@ -116,6 +133,42 @@
         </div>
       </section>`;
     document.body.appendChild(overlay);
+
+    const createOverlay = document.createElement('div');
+    createOverlay.id = 'category-product-create-overlay';
+    createOverlay.className = 'category-product-create-overlay';
+    createOverlay.setAttribute('aria-hidden', 'true');
+    createOverlay.innerHTML = `
+      <section class="category-product-create-dialog" role="dialog" aria-modal="true" aria-labelledby="category-product-create-title">
+        <div class="category-page-editor-head">
+          <div>
+            <span class="category-page-editor-eyebrow">Новый продукт</span>
+            <h2 id="category-product-create-title">Добавить продукт</h2>
+            <p>Будет создана новая страница продукта внутри текущей категории. Подробности продукта можно заполнить после сохранения на его странице.</p>
+          </div>
+          <button type="button" class="category-page-editor-close" id="category-product-create-close" aria-label="Закрыть">×</button>
+        </div>
+        <div class="category-product-create-body">
+          <label class="category-page-editor-field">
+            <span>Название продукта</span>
+            <input id="category-product-title" type="text" autocomplete="off" placeholder="Например, Mesh Optimizer">
+          </label>
+          <label class="category-page-editor-field">
+            <span>Адрес страницы</span>
+            <div class="category-product-address-row"><span>product.html?id=</span><input id="category-product-id" type="text" autocomplete="off" placeholder="mesh-optimizer"></div>
+            <small>Латинские буквы, цифры и дефисы. Существующий ID использовать нельзя.</small>
+          </label>
+          <div class="category-product-create-state" id="category-product-create-state"></div>
+        </div>
+        <div class="category-page-editor-footer">
+          <span></span>
+          <div class="category-page-editor-actions">
+            <button type="button" class="button button-secondary" id="category-product-create-cancel">Отмена</button>
+            <button type="button" class="button button-primary" id="category-product-create-confirm">Добавить</button>
+          </div>
+        </div>
+      </section>`;
+    document.body.appendChild(createOverlay);
   }
 
   async function load({ announce = false } = {}) {
@@ -149,10 +202,69 @@
 
   function closeEditor() {
     if (saving) return;
+    closeCreateProduct();
     const overlay = q('#category-page-editor-overlay');
     overlay?.classList.remove('open');
     overlay?.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
+  }
+
+  function openCreateProduct() {
+    const overlay = q('#category-product-create-overlay');
+    if (!overlay) return;
+    const titleInput = q('#category-product-title');
+    const idInput = q('#category-product-id');
+    titleInput.value = '';
+    idInput.value = '';
+    idInput.dataset.touched = '';
+    q('#category-product-create-state').textContent = '';
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    setTimeout(() => titleInput.focus(), 0);
+  }
+
+  function closeCreateProduct() {
+    const overlay = q('#category-product-create-overlay');
+    overlay?.classList.remove('open');
+    overlay?.setAttribute('aria-hidden', 'true');
+  }
+
+  function addProduct() {
+    const title = q('#category-product-title')?.value.trim() || '';
+    const id = slugify(q('#category-product-id')?.value || title);
+    const state = q('#category-product-create-state');
+    if (!title) {
+      state.textContent = 'Укажи название продукта.';
+      return;
+    }
+    if (!id || !/^[a-z0-9-]+$/.test(id)) {
+      state.textContent = 'Адрес должен содержать латинские буквы, цифры и дефисы.';
+      return;
+    }
+    const allProducts = Array.isArray(catalog?.products) ? catalog.products : [];
+    if (allProducts.some(item => String(item.id || '').toLowerCase() === id) || workingProducts.some(item => item.id === id)) {
+      state.textContent = 'Продукт с таким адресом уже существует. Открой существующий продукт вместо создания копии.';
+      return;
+    }
+
+    workingProducts.push({
+      id,
+      category: categoryId,
+      title,
+      status: '',
+      version: '',
+      shortDescription: '',
+      description: '',
+      cover: '',
+      gallery: [],
+      features: [],
+      specs: [],
+      links: { primaryLabel: '', primaryUrl: '' },
+      __new: true
+    });
+    renderProductRows();
+    closeCreateProduct();
+    setState(`Продукт «${title}» подготовлен. Нажми «Сохранить», затем его можно будет открыть и заполнить.`);
   }
 
   function moveProduct(id, direction) {
@@ -163,26 +275,18 @@
     renderProductRows();
   }
 
-  function reorderLatestProducts(latestProducts) {
-    const preferredIds = workingProducts.map(item => item.id);
-    const latestCategoryProducts = latestProducts.filter(item => item.category === categoryId);
-    const byId = new Map(latestCategoryProducts.map(item => [item.id, item]));
-    const ordered = [];
-    preferredIds.forEach(id => {
-      const item = byId.get(id);
-      if (!item) return;
-      ordered.push(item);
-      byId.delete(id);
-    });
-    latestCategoryProducts.forEach(item => {
-      if (byId.has(item.id)) {
-        ordered.push(item);
-        byId.delete(item.id);
+  function mergeWorkingProducts(latestProducts) {
+    const existingOutside = latestProducts.filter(item => item.category !== categoryId);
+    const latestCategoryById = new Map(latestProducts.filter(item => item.category === categoryId).map(item => [item.id, item]));
+    const orderedCategory = workingProducts.map(item => {
+      if (item.__new) {
+        const copy = clone(item);
+        delete copy.__new;
+        return copy;
       }
+      return latestCategoryById.get(item.id) || clone(item);
     });
-
-    let cursor = 0;
-    return latestProducts.map(item => item.category === categoryId ? ordered[cursor++] : item);
+    return [...existingOutside, ...orderedCategory];
   }
 
   async function save() {
@@ -193,14 +297,20 @@
       saveButton.disabled = true;
       saveButton.textContent = 'Сохранение…';
     }
-    setState('Публикую страницу категории в GitHub…', 'busy');
+    setState('Публикую страницу категории и продукты в GitHub…', 'busy');
 
     try {
       const latest = await fetchCatalog();
       const latestCategory = (latest.categories || []).find(item => item.id === categoryId);
       if (!latestCategory) throw new Error('Категория больше не существует.');
+
+      const latestIds = new Set((latest.products || []).map(item => item.id));
+      for (const item of workingProducts.filter(product => product.__new)) {
+        if (latestIds.has(item.id)) throw new Error(`ID «${item.id}» уже появился в каталоге. Выбери другой адрес.`);
+      }
+
       latestCategory.description = q('#category-page-description-input')?.value.trim() || '';
-      latest.products = reorderLatestProducts(Array.isArray(latest.products) ? latest.products : []);
+      latest.products = mergeWorkingProducts(Array.isArray(latest.products) ? latest.products : []);
 
       const response = await fetch(API_URL, {
         method: 'POST',
@@ -213,8 +323,8 @@
 
       const visibleDescription = q('#category-description');
       if (visibleDescription) visibleDescription.textContent = latestCategory.description;
-      setState('Страница категории сохранена и опубликована.', 'ok');
-      showToast('Страница категории сохранена в GitHub.');
+      setState('Страница категории и продукты сохранены и опубликованы.', 'ok');
+      showToast('Категория сохранена в GitHub.');
       setTimeout(() => {
         saving = false;
         if (saveButton) {
@@ -247,6 +357,18 @@
     q('#category-page-editor-close')?.addEventListener('click', closeEditor);
     q('#category-page-editor-cancel')?.addEventListener('click', closeEditor);
     q('#category-page-editor-save')?.addEventListener('click', save);
+    q('#category-page-add-product')?.addEventListener('click', openCreateProduct);
+    q('#category-product-create-close')?.addEventListener('click', closeCreateProduct);
+    q('#category-product-create-cancel')?.addEventListener('click', closeCreateProduct);
+    q('#category-product-create-confirm')?.addEventListener('click', addProduct);
+    q('#category-product-title')?.addEventListener('input', event => {
+      const id = q('#category-product-id');
+      if (id && !id.dataset.touched) id.value = slugify(event.target.value);
+    });
+    q('#category-product-id')?.addEventListener('input', event => {
+      event.target.dataset.touched = event.target.value ? '1' : '';
+      event.target.value = slugify(event.target.value);
+    });
     q('#category-page-products-list')?.addEventListener('click', event => {
       const row = event.target.closest('.category-page-product-row');
       if (!row) return;
@@ -261,8 +383,17 @@
     q('#category-page-editor-overlay')?.addEventListener('click', event => {
       if (event.target === q('#category-page-editor-overlay')) closeEditor();
     });
+    q('#category-product-create-overlay')?.addEventListener('click', event => {
+      if (event.target === q('#category-product-create-overlay')) closeCreateProduct();
+    });
     document.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && q('#category-page-editor-overlay')?.classList.contains('open')) {
+      if (event.key !== 'Escape') return;
+      if (q('#category-product-create-overlay')?.classList.contains('open')) {
+        event.preventDefault();
+        closeCreateProduct();
+        return;
+      }
+      if (q('#category-page-editor-overlay')?.classList.contains('open')) {
         event.preventDefault();
         closeEditor();
       }
