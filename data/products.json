@@ -101,18 +101,8 @@
       {
         "label": "Contact",
         "href": "contact.html"
-      },
-      {
-        "label": "Support",
-        "href": "page.html?page=support"
       }
     ]
   },
-  "sitePages": [
-    {
-      "id": "support",
-      "title": "Support",
-      "description": ""
-    }
-  ]
+  "sitePages": []
 }
