@@ -25,6 +25,7 @@
       "version": "1.0.0",
       "shortDescription": "Generate practical colliders for complex 3D meshes directly inside the Unity Editor.",
       "description": "3D Collider is a Unity Editor tool for generating colliders from complex meshes. In non-convex mode it creates surface-based MeshCollider geometry that can preserve openings, holes, tunnels and passages. In Convex mode it creates closed convex MeshColliders generated from the model surface for Rigidbody workflows.",
+      "href": "product.html?id=3d-collider",
       "cover": "assets/images/3d-collider-cover.webp",
       "gallery": [
         "assets/images/3d-collider-unity.webp"
@@ -70,6 +71,7 @@
       "version": "",
       "shortDescription": "Create and edit 3D geometry directly inside Unity.",
       "description": "An in-Editor 3D modeling workflow being developed by Kianan Studio.",
+      "href": "product.html?id=3deditor",
       "cover": "",
       "gallery": [],
       "features": [],
