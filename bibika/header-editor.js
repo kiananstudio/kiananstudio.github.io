@@ -27,6 +27,7 @@
   let repositoryPages = [...FALLBACK_REPO_PAGES];
   let saving = false;
   let editingPageId = null;
+  let deletingPageId = null;
 
   const q = (selector, root = document) => root.querySelector(selector);
   const qa = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -118,6 +119,20 @@
 
   function managedPageHref(id) {
     return `page.html?page=${encodeURIComponent(id)}`;
+  }
+
+  function managedPageIdFromHref(value) {
+    const href = String(value || '').trim();
+    if (!href) return '';
+    try {
+      const url = new URL(href, 'https://kiananstudio.com/');
+      if (url.origin !== 'https://kiananstudio.com') return '';
+      if (!/\/page\.html$/i.test(url.pathname)) return '';
+      const id = String(url.searchParams.get('page') || '').trim().toLowerCase();
+      return /^[a-z0-9-]+$/.test(id) ? id : '';
+    } catch {
+      return '';
+    }
   }
 
   function friendlyFileTitle(path) {
@@ -515,8 +530,10 @@
     const type = q('#header-page-content-type')?.value || 'text';
     const textFields = q('#header-page-text-fields');
     const categoryFields = q('#header-page-category-fields');
+    const categoryCreateNote = q('#header-page-category-create-note');
     if (textFields) textFields.hidden = type !== 'text';
-    if (categoryFields) categoryFields.hidden = type !== 'categories';
+    if (categoryFields) categoryFields.hidden = type !== 'categories' || !editingPageId;
+    if (categoryCreateNote) categoryCreateNote.hidden = type !== 'categories' || !!editingPageId;
   }
 
   function openPageDialog(page = null) {
@@ -562,10 +579,7 @@
   }
 
   function validatePageCards(cards, state) {
-    if (!cards.length) {
-      if (state) state.textContent = 'Добавь хотя бы одну категорию.';
-      return false;
-    }
+    if (!cards.length) return true;
     for (let index = 0; index < cards.length; index += 1) {
       const card = cards[index];
       if (!card.title) {
@@ -588,7 +602,7 @@
     const type = q('#header-page-content-type')?.value === 'categories' ? 'categories' : 'text';
     const heading = q('#header-page-heading')?.value.trim() || title;
     const content = q('#header-page-text')?.value.trim() || '';
-    const cards = type === 'categories' ? collectPageCards() : [];
+    const cards = type === 'categories' && existing ? collectPageCards() : [];
     const state = q('#header-page-create-state');
 
     if (!title) {
@@ -626,7 +640,7 @@
       type,
       heading,
       content: type === 'text' ? content : '',
-      cards,
+      cards: [],
       legacyCategoryIds: [],
       managed: true
     });
@@ -645,20 +659,93 @@
     setState(`Страница «${title}» подготовлена и добавлена в Header. Нажми «Сохранить».`);
   }
 
-  function deleteManagedPage(id) {
+  function nestedManagedPages(page) {
+    if (!page || page.type !== 'categories') return [];
+    const cards = page.cards.length ? page.cards : legacyCardsFor(page);
+    const ids = [];
+    const seen = new Set();
+    cards.forEach((card) => {
+      const id = managedPageIdFromHref(card.href);
+      if (!id || id === page.id || seen.has(id)) return;
+      const nested = workingPages.find((item) => item.id === id);
+      if (!nested) return;
+      seen.add(id);
+      ids.push(nested);
+    });
+    return ids;
+  }
+
+  function openDeletePage(id) {
     const page = workingPages.find((item) => item.id === id);
     if (!page) return;
-    const href = managedPageHref(page.id);
-    const linkedRows = qa('.header-link-row', q('#header-links-editor')).filter((row) => rowHref(row) === href);
-    const suffix = linkedRows.length ? ' Связанные с ней кнопки Header тоже будут удалены.' : '';
-    if (!window.confirm(`Удалить страницу «${page.title}»?${suffix}`)) return;
+    deletingPageId = id;
+    const nested = nestedManagedPages(page);
+    const overlay = q('#header-page-delete-overlay');
+    const checkboxWrap = q('#header-page-delete-nested-wrap');
+    const checkbox = q('#header-page-delete-nested');
+    const nestedInfo = q('#header-page-delete-nested-info');
 
-    workingPages = workingPages.filter((item) => item.id !== id);
-    linkedRows.forEach((row) => row.remove());
+    q('#header-page-delete-title').textContent = `Удалить страницу «${page.title}»?`;
+    q('#header-page-delete-copy').textContent = 'Страница и связанные с ней кнопки Header будут удалены после нажатия «Сохранить».';
+
+    if (checkbox) {
+      checkbox.checked = false;
+      checkbox.disabled = !nested.length;
+    }
+    if (checkboxWrap) checkboxWrap.hidden = page.type !== 'categories';
+    if (nestedInfo) {
+      if (page.type !== 'categories') {
+        nestedInfo.textContent = '';
+      } else if (nested.length) {
+        nestedInfo.textContent = `Будут доступны для удаления: ${nested.map((item) => item.title).join(', ')}.`;
+      } else {
+        nestedInfo.textContent = 'В карточках этой страницы нет ссылок на другие страницы Bibika.';
+      }
+    }
+
+    overlay?.classList.add('open');
+    overlay?.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeDeletePage() {
+    const overlay = q('#header-page-delete-overlay');
+    overlay?.classList.remove('open');
+    overlay?.setAttribute('aria-hidden', 'true');
+    deletingPageId = null;
+  }
+
+  function removeHeaderLinksToPageIds(ids) {
+    const hrefs = new Set(ids.map((id) => managedPageHref(id)));
+    qa('.header-link-row', q('#header-links-editor')).forEach((row) => {
+      if (hrefs.has(rowHref(row))) row.remove();
+    });
+  }
+
+  function confirmDeletePage() {
+    const page = workingPages.find((item) => item.id === deletingPageId);
+    if (!page) {
+      closeDeletePage();
+      return;
+    }
+
+    const nested = nestedManagedPages(page);
+    const cascade = page.type === 'categories' && !!q('#header-page-delete-nested')?.checked;
+    const ids = new Set([page.id]);
+    if (cascade) nested.forEach((item) => ids.add(item.id));
+
+    workingPages = workingPages.filter((item) => !ids.has(item.id));
+    removeHeaderLinksToPageIds([...ids]);
     renumberRows();
     renderPagesManager();
     refreshPageSelectors();
-    setState(`Страница «${page.title}» будет удалена после сохранения.`);
+    closeDeletePage();
+
+    const extra = cascade && nested.length ? ` Вместе с ней будут удалены вложенные страницы: ${nested.map((item) => `«${item.title}»`).join(', ')}.` : '';
+    setState(`Страница «${page.title}» будет удалена после сохранения.${extra}`);
+  }
+
+  function deleteManagedPage(id) {
+    openDeletePage(id);
   }
 
   async function saveHeader() {
@@ -781,7 +868,7 @@
             <div>
               <span class="header-editor-eyebrow" id="header-page-create-eyebrow">Новая страница</span>
               <h2 id="header-page-create-title">Создать страницу</h2>
-              <p>Выбери тип страницы. Для блока категорий ты создаёшь собственные карточки, а не вставляешь категории главной страницы.</p>
+              <p>Выбери тип страницы. Если это блок категорий, сами категории можно добавить позже через редактирование страницы.</p>
             </div>
             <button type="button" class="header-editor-close" id="header-page-create-close" aria-label="Закрыть">×</button>
           </div>
@@ -812,6 +899,9 @@
                 <textarea id="header-page-text" rows="8" placeholder="Текст страницы..."></textarea>
               </label>
             </div>
+            <div id="header-page-category-create-note" class="header-page-category-create-note" hidden>
+              Страница будет создана без категорий. После создания нажми ✎ возле этой страницы и добавь нужные категории.
+            </div>
             <div id="header-page-category-fields" class="header-page-content-fields" hidden>
               <div class="header-page-categories-head">
                 <div><strong>Категории на этой странице</strong><span>Добавляй свои карточки: название, иконку, описание и ссылку. Порядок можно менять стрелками.</span></div>
@@ -827,6 +917,33 @@
             <div class="header-editor-footer-actions">
               <button type="button" class="button button-secondary" id="header-page-create-cancel">Отмена</button>
               <button type="button" class="button button-primary" id="header-page-create-confirm">Создать</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="header-page-delete-overlay" id="header-page-delete-overlay" aria-hidden="true">
+        <section class="header-page-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="header-page-delete-title">
+          <div class="header-editor-head">
+            <div>
+              <span class="header-editor-eyebrow">Удаление страницы</span>
+              <h2 id="header-page-delete-title">Удалить страницу?</h2>
+              <p id="header-page-delete-copy"></p>
+            </div>
+            <button type="button" class="header-editor-close" id="header-page-delete-close" aria-label="Закрыть">×</button>
+          </div>
+          <div class="header-page-delete-body">
+            <label class="header-page-delete-nested" id="header-page-delete-nested-wrap" hidden>
+              <input type="checkbox" id="header-page-delete-nested" />
+              <span><strong>Удалить вложенные категории</strong><small>Будут удалены страницы Bibika, на которые ведут карточки этой страницы. Существующие защищённые страницы и внешние ссылки не затрагиваются.</small></span>
+            </label>
+            <div class="header-page-delete-nested-info" id="header-page-delete-nested-info"></div>
+          </div>
+          <div class="header-editor-footer">
+            <span></span>
+            <div class="header-editor-footer-actions">
+              <button type="button" class="button button-secondary" id="header-page-delete-cancel">Отмена</button>
+              <button type="button" class="button button-primary header-page-delete-confirm" id="header-page-delete-confirm">Удалить</button>
             </div>
           </div>
         </section>
@@ -970,11 +1087,18 @@
       if (deleteButton) deleteManagedPage(row.dataset.pageId);
     });
 
+    q('#header-page-delete-close')?.addEventListener('click', closeDeletePage);
+    q('#header-page-delete-cancel')?.addEventListener('click', closeDeletePage);
+    q('#header-page-delete-confirm')?.addEventListener('click', confirmDeletePage);
+
     q('#header-editor-overlay')?.addEventListener('click', (event) => {
       if (event.target === q('#header-editor-overlay')) closeEditor();
     });
     q('#header-page-create-overlay')?.addEventListener('click', (event) => {
       if (event.target === q('#header-page-create-overlay')) closeCreatePage();
+    });
+    q('#header-page-delete-overlay')?.addEventListener('click', (event) => {
+      if (event.target === q('#header-page-delete-overlay')) closeDeletePage();
     });
 
     document.addEventListener('click', (event) => {
@@ -989,6 +1113,11 @@
       if (openPicker) {
         event.preventDefault();
         closeIconPickers();
+        return;
+      }
+      if (q('#header-page-delete-overlay')?.classList.contains('open')) {
+        event.preventDefault();
+        closeDeletePage();
         return;
       }
       if (q('#header-page-create-overlay')?.classList.contains('open')) {
