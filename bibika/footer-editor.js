@@ -219,7 +219,7 @@
     q('#footer-editor-close')?.addEventListener('click', closeEditor);
     q('#footer-editor-cancel')?.addEventListener('click', closeEditor);
     q('#footer-editor-save')?.addEventListener('click', saveFooter);
-    q('#footer-editor-body')?.addEventListener('input', updatePreview);
+    q('.footer-editor-body')?.addEventListener('input', updatePreview);
     q('#footer-editor-overlay')?.addEventListener('click', (event) => {
       if (event.target === q('#footer-editor-overlay')) closeEditor();
     });
