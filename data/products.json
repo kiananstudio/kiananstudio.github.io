@@ -79,5 +79,44 @@
         "primaryUrl": ""
       }
     }
+  ],
+  "siteHeader": {
+    "links": [
+      {
+        "label": "Unity Tools",
+        "href": "category.html?category=unity-tools"
+      },
+      {
+        "label": "Games",
+        "href": "category.html?category=games"
+      },
+      {
+        "label": "3D Assets",
+        "href": "category.html?category=3d-assets"
+      },
+      {
+        "label": "About",
+        "href": "about.html"
+      },
+      {
+        "label": "Contact",
+        "href": "contact.html"
+      },
+      {
+        "label": "Support",
+        "href": "page.html?page=support"
+      },
+      {
+        "label": "Support",
+        "href": "page.html?page=support"
+      }
+    ]
+  },
+  "sitePages": [
+    {
+      "id": "support",
+      "title": "Support",
+      "description": ""
+    }
   ]
 }
