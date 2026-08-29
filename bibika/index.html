@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" href="https://kiananstudio.com/assets/icons/favicon.png" />
   <link rel="stylesheet" href="https://kiananstudio.com/styles.css" />
   <link rel="stylesheet" href="https://kiananstudio.com/layout-v2.css" />
-  <link rel="stylesheet" href="visual-home.css?v=4" />
+  <link rel="stylesheet" href="visual-home.css?v=5" />
   <link rel="stylesheet" href="header-editor.css?v=1" />
   <script defer src="visual-home.js?v=2"></script>
   <script defer src="header-editor.js?v=1"></script>
@@ -49,13 +49,15 @@
 
   <main>
     <section class="home-banner-section">
-      <div class="home-banner-wrap admin-block">
-        <button class="admin-edit" type="button" data-edit-block="Главный баннер">✎ Редактировать</button>
-        <img class="home-banner" src="https://kiananstudio.com/assets/images/kianan-banner.webp" alt="Kianan Studio — tools, 3D assets and games" onerror="this.style.display='none';this.parentElement.classList.add('banner-placeholder')" />
-        <div class="banner-placeholder-copy">
-          <span class="eyebrow">Kianan Studio</span>
-          <h1>Tools · Assets · Games</h1>
+      <div class="banner-admin-shell">
+        <div class="home-banner-wrap">
+          <img class="home-banner" src="https://kiananstudio.com/assets/images/kianan-banner.webp" alt="Kianan Studio — tools, 3D assets and games" onerror="this.style.display='none';this.parentElement.classList.add('banner-placeholder')" />
+          <div class="banner-placeholder-copy">
+            <span class="eyebrow">Kianan Studio</span>
+            <h1>Tools · Assets · Games</h1>
+          </div>
         </div>
+        <button class="banner-edit-trigger" type="button" data-edit-block="Главный баннер" aria-label="Редактировать баннер" title="Редактировать баннер"><span class="mirrored-pencil" aria-hidden="true">✎</span></button>
       </div>
     </section>
 
