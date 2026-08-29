@@ -5,15 +5,22 @@
     games: '🎮',
     '3d-assets': '⬡'
   };
+  const hasOwn = (object, key) => !!object && Object.prototype.hasOwnProperty.call(object, key);
 
   function normalizeCategories(value) {
     if (!Array.isArray(value)) return [];
-    return value.map((item) => ({
-      id: String(item?.id || '').trim(),
-      title: String(item?.title || '').trim(),
-      description: String(item?.description || '').trim(),
-      icon: String(item?.icon || DEFAULT_ICONS[item?.id] || '◆').trim() || '◆'
-    })).filter((item) => item.id && item.title);
+    return value.map((item) => {
+      const id = String(item?.id || '').trim();
+      const icon = hasOwn(item, 'icon')
+        ? String(item.icon ?? '').trim()
+        : (DEFAULT_ICONS[id] || '◆');
+      return {
+        id,
+        title: String(item?.title || '').trim(),
+        description: String(item?.description || '').trim(),
+        icon
+      };
+    }).filter((item) => item.id && item.title);
   }
 
   function renderCategories(categories) {
