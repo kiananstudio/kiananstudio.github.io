@@ -11,12 +11,14 @@
   <link rel="stylesheet" href="https://kiananstudio.com/layout-v2.css" />
   <link rel="stylesheet" href="visual-home.css?v=7" />
   <link rel="stylesheet" href="header-editor.css?v=2" />
-  <link rel="stylesheet" href="header-page-content.css?v=2" />
+  <link rel="stylesheet" href="header-page-content.css?v=3" />
   <link rel="stylesheet" href="footer-editor.css?v=1" />
+  <link rel="stylesheet" href="category-page-editor.css?v=1" />
   <script defer src="bibika-navigation.js?v=1"></script>
-  <script defer src="header-editor.js?v=4"></script>
+  <script defer src="header-editor.js?v=5"></script>
   <script defer src="footer-editor.js?v=1"></script>
   <script defer src="category-page.js?v=1"></script>
+  <script defer src="category-page-editor.js?v=1"></script>
 </head>
 <body>
   <div class="bibika-adminbar" aria-label="Панель Bibika">
@@ -51,7 +53,7 @@
   </header>
 
   <main class="product-page">
-    <div class="product-page-shell">
+    <div class="product-page-shell bibika-category-edit-shell">
       <a class="back-link" href="./">← Home</a>
       <div class="section-heading">
         <span class="eyebrow">Browse</span>
@@ -59,6 +61,7 @@
         <p id="category-description"></p>
       </div>
       <div class="catalog-list" id="category-list"><p class="load-error">Loading…</p></div>
+      <button class="bibika-category-edit-trigger" id="edit-category-page" type="button" aria-label="Редактировать страницу категории" title="Редактировать страницу категории"><span class="mirrored-pencil" aria-hidden="true">✎</span></button>
     </div>
   </main>
 
