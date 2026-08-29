@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#080d12" />
+  <title>Kianan Studio</title>
+  <link rel="icon" type="image/png" href="assets/icons/favicon.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="layout-v2.css" />
+  <script defer src="site-header.js"></script>
+  <script defer src="site-page.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-shell">
+      <a class="brand" href="./" aria-label="Kianan Studio home">
+        <img class="brand-logo" src="assets/images/kianan-studio-logo.webp" alt="Kianan Studio" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'" />
+        <span class="brand-mark brand-fallback" style="display:none">K</span>
+        <span class="brand-name"><strong>Kianan</strong><small>Studio</small></span>
+      </a>
+      <button class="nav-toggle" aria-label="Open navigation" aria-expanded="false">☰</button>
+      <nav class="nav-links" aria-label="Main navigation">
+        <a href="category.html?category=unity-tools">Unity Tools</a>
+        <a href="category.html?category=games">Games</a>
+        <a href="category.html?category=3d-assets">3D Assets</a>
+        <a href="about.html">About</a>
+        <a href="contact.html">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="section" id="managed-page">
+      <div class="section-heading standalone-heading">
+        <span class="eyebrow">Kianan Studio</span>
+        <h1 class="catalog-page-title" id="managed-page-title">Page</h1>
+        <p id="managed-page-description" hidden></p>
+      </div>
+      <div id="managed-page-content"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand"><strong>Kianan Studio</strong><span>Unity tools, 3D assets and games.</span></div>
+      <p>© <span id="year"></span> Kianan Studio. All rights reserved.</p>
+    </div>
+  </footer>
+</body>
+</html>
