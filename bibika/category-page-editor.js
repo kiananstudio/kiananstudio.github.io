@@ -1,17 +1,23 @@
 (() => {
   const API_URL = '/api/catalog';
+  const IMAGE_API_URL = '/api/image';
+  const IMAGE_CLEANUP_URL = '/api/image/cleanup';
+  const PUBLIC_ORIGIN = 'https://kiananstudio.com';
+  const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
+  const ICON_SIZE = 512;
+  const WEBP_QUALITY = 0.85;
+  const ALLOWED_TYPES = new Set(['image/webp', 'image/png', 'image/jpeg']);
+  const ALLOWED_EXTENSIONS = /\.(webp|png|jpe?g)$/i;
   const params = new URLSearchParams(location.search);
   const categoryId = String(params.get('category') || 'unity-tools').trim();
-  const ICON_CHOICES = [
-    '◇','◆','⬡','⬢','◈','◉','◎','✦','✧','★','⚙️','🛠️','🔧','🧰','🎮','🕹️','🎲','🧊','📦','🧱',
-    '🧩','🖥️','💻','📱','🌐','🚀','✨','🧪','🔬','🎨','🧭','🗂️','📐','🔷','🔹','▶️','📘','📄','🧠','🧱'
-  ];
 
   let catalog = null;
   let category = null;
   let workingProducts = [];
   let saving = false;
   let activeHrefInput = null;
+  let pendingIconRow = null;
+  const sessionUploads = new Set();
 
   const q = (selector, root = document) => root.querySelector(selector);
   const qa = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -32,6 +38,21 @@
     return data;
   }
 
+  async function cleanupPaths(paths) {
+    const unique = [...new Set((paths || []).filter(Boolean))];
+    if (!unique.length) return;
+    try {
+      await fetch(IMAGE_CLEANUP_URL, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paths: unique })
+      });
+    } catch (error) {
+      console.warn('Bibika icon cleanup failed', error);
+    }
+  }
+
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
   }
@@ -43,6 +64,18 @@
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 70);
+  }
+
+  function assetUrl(value) {
+    const path = String(value || '').trim();
+    if (!path) return '';
+    if (/^https?:\/\//i.test(path)) return path;
+    return `${PUBLIC_ORIGIN}/${path.replace(/^\/+/, '')}`;
+  }
+
+  function isImageIcon(value) {
+    const path = String(value || '').trim();
+    return /^https?:\/\//i.test(path) || /^(?:assets\/|\/assets\/)/i.test(path) || /\.(webp|png|jpe?g)(?:[?#].*)?$/i.test(path);
   }
 
   function defaultProductHref(product) {
@@ -85,7 +118,7 @@
     const raw = String(value || '').trim();
     if (!raw) return '';
     try {
-      const url = new URL(raw, 'https://kiananstudio.com/');
+      const url = new URL(raw, `${PUBLIC_ORIGIN}/`);
       if (url.hostname !== 'kiananstudio.com' && url.hostname !== 'www.kiananstudio.com') return '';
       if (!/\/product\.html$/i.test(url.pathname)) return '';
       return slugify(url.searchParams.get('id') || '');
@@ -94,8 +127,26 @@
     }
   }
 
-  function iconPickerMarkup() {
-    return ICON_CHOICES.map(icon => `<button type="button" class="category-page-icon-choice" data-icon="${icon}" title="${icon}">${icon}</button>`).join('');
+  function setIconPreview(row, value) {
+    const host = q('.category-page-product-icon-value', row);
+    if (!host) return;
+    host.replaceChildren();
+    const icon = String(value || '').trim();
+    if (!icon) {
+      host.classList.add('empty');
+      host.textContent = 'Нет';
+      return;
+    }
+    host.classList.remove('empty');
+    if (isImageIcon(icon)) {
+      const img = document.createElement('img');
+      img.src = assetUrl(icon);
+      img.alt = '';
+      img.loading = 'lazy';
+      host.appendChild(img);
+    } else {
+      host.textContent = icon;
+    }
   }
 
   function createProductRow(product, index) {
@@ -113,9 +164,9 @@
       <div class="category-page-editor-field category-page-product-icon-field">
         <span>Иконка</span>
         <div class="category-page-product-icon-control">
-          <span class="category-page-product-icon-value"></span>
-          <button type="button" class="category-page-product-icon-pick" title="Выбрать иконку" aria-label="Выбрать иконку">▦</button>
-          <button type="button" class="category-page-product-icon-clear" title="Очистить иконку" aria-label="Очистить иконку">×</button>
+          <span class="category-page-product-icon-value empty">Нет</span>
+          <button type="button" class="category-page-product-icon-pick" title="Выбрать изображение на компьютере">Выбрать</button>
+          <button type="button" class="category-page-product-icon-clear" title="Удалить иконку" aria-label="Удалить иконку">×</button>
         </div>
       </div>
       <label class="category-page-editor-field">
@@ -130,13 +181,12 @@
         <button type="button" class="category-page-product-action category-page-product-up" title="Переместить выше">↑</button>
         <button type="button" class="category-page-product-action category-page-product-down" title="Переместить ниже">↓</button>
         ${product.__new ? '<button type="button" class="category-page-product-action category-page-product-remove" title="Убрать новый продукт">×</button>' : ''}
-      </div>
-      <div class="category-page-product-icon-picker">${iconPickerMarkup()}</div>`;
+      </div>`;
 
     q('.category-page-product-title', row).value = product.title || '';
     q('.category-page-product-description', row).value = product.shortDescription || '';
     q('.category-page-product-href', row).value = product.href || '';
-    q('.category-page-product-icon-value', row).textContent = product.icon || '';
+    setIconPreview(row, product.icon);
     q('.category-page-product-up', row).disabled = index === 0;
     q('.category-page-product-down', row).disabled = index === workingProducts.length - 1;
     return row;
@@ -166,12 +216,6 @@
       next.push(product);
     });
     workingProducts = next;
-  }
-
-  function closeIconPickers(except = null) {
-    qa('.category-page-product-row-fields.icon-picker-open').forEach(row => {
-      if (row !== except) row.classList.remove('icon-picker-open');
-    });
   }
 
   function sitePageItems(data) {
@@ -278,6 +322,13 @@
         </div>
       </section>`;
     document.body.appendChild(overlay);
+
+    const fileInput = document.createElement('input');
+    fileInput.id = 'category-product-icon-file';
+    fileInput.type = 'file';
+    fileInput.accept = 'image/webp,image/png,image/jpeg,.webp,.png,.jpg,.jpeg';
+    fileInput.hidden = true;
+    document.body.appendChild(fileInput);
   }
 
   async function load({ announce = false } = {}) {
@@ -310,9 +361,16 @@
     document.body.style.overflow = 'hidden';
   }
 
+  function discardSessionUploads() {
+    const paths = [...sessionUploads];
+    sessionUploads.clear();
+    if (paths.length) cleanupPaths(paths);
+  }
+
   function closeEditor() {
     if (saving) return;
-    closeIconPickers();
+    pendingIconRow = null;
+    discardSessionUploads();
     const overlay = q('#category-page-editor-overlay');
     overlay?.classList.remove('open');
     overlay?.setAttribute('aria-hidden', 'true');
@@ -322,20 +380,8 @@
   function addProduct() {
     syncWorkingFromRows();
     workingProducts.push(normalizeProduct({
-      id: '',
-      category: categoryId,
-      title: '',
-      icon: '',
-      shortDescription: '',
-      href: '',
-      status: '',
-      version: '',
-      description: '',
-      cover: '',
-      gallery: [],
-      features: [],
-      specs: [],
-      links: { primaryLabel: '', primaryUrl: '' }
+      id: '', category: categoryId, title: '', icon: '', shortDescription: '', href: '', status: '', version: '',
+      description: '', cover: '', gallery: [], features: [], specs: [], links: { primaryLabel: '', primaryUrl: '' }
     }, true));
     renderProductRows();
     const last = q('.category-page-product-row-fields:last-child');
@@ -356,8 +402,124 @@
     syncWorkingFromRows();
     const product = workingProducts.find(item => item.__key === key);
     if (!product?.__new) return;
+    if (sessionUploads.has(product.icon)) {
+      sessionUploads.delete(product.icon);
+      cleanupPaths([product.icon]);
+    }
     workingProducts = workingProducts.filter(item => item.__key !== key);
     renderProductRows();
+  }
+
+  function validateSourceFile(file) {
+    if (!file) return 'Файл не выбран.';
+    if (!ALLOWED_TYPES.has(file.type) || !ALLOWED_EXTENSIONS.test(file.name)) {
+      return 'Разрешены только WEBP, PNG, JPG и JPEG.';
+    }
+    if (file.size > MAX_SOURCE_BYTES) return 'Исходное изображение слишком большое. Максимум 20 МБ.';
+    return '';
+  }
+
+  function loadImage(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(image);
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Не удалось прочитать изображение.'));
+      };
+      image.src = url;
+    });
+  }
+
+  async function prepareIconBlob(file) {
+    const image = await loadImage(file);
+    const canvas = document.createElement('canvas');
+    canvas.width = ICON_SIZE;
+    canvas.height = ICON_SIZE;
+    const ctx = canvas.getContext('2d', { alpha: true });
+    ctx.clearRect(0, 0, ICON_SIZE, ICON_SIZE);
+    const scale = Math.max(ICON_SIZE / image.naturalWidth, ICON_SIZE / image.naturalHeight);
+    const width = image.naturalWidth * scale;
+    const height = image.naturalHeight * scale;
+    ctx.drawImage(image, (ICON_SIZE - width) / 2, (ICON_SIZE - height) / 2, width, height);
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Не удалось конвертировать изображение в WEBP.')), 'image/webp', WEBP_QUALITY);
+    });
+  }
+
+  function uploadSlugForRow(row) {
+    const existing = workingProducts.find(item => item.__key === row.dataset.productKey);
+    if (existing?.id) return existing.id;
+    const hrefId = productIdFromHref(q('.category-page-product-href', row)?.value || '');
+    if (hrefId) return hrefId;
+    return slugify(q('.category-page-product-title', row)?.value || '') || `${categoryId}-product`;
+  }
+
+  async function uploadIconForRow(row, file) {
+    const error = validateSourceFile(file);
+    if (error) {
+      showToast(error, 4500);
+      return;
+    }
+
+    const button = q('.category-page-product-icon-pick', row);
+    const previous = String(row.dataset.icon || '').trim();
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Загрузка…';
+    }
+    setState('Подготавливаю и загружаю иконку…', 'busy');
+
+    try {
+      const blob = await prepareIconBlob(file);
+      const response = await fetch(IMAGE_API_URL, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'image/webp',
+          'X-Bibika-Product': uploadSlugForRow(row),
+          'X-Bibika-Target': 'icon'
+        },
+        body: blob
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+
+      const path = String(result.path || '').trim();
+      if (!path) throw new Error('Сервер не вернул путь к иконке.');
+      row.dataset.icon = path;
+      setIconPreview(row, path);
+      sessionUploads.add(path);
+
+      if (previous && previous !== path && sessionUploads.has(previous)) {
+        sessionUploads.delete(previous);
+        cleanupPaths([previous]);
+      }
+      setState('Иконка загружена. Нажми «Сохранить», чтобы привязать её к продукту.');
+    } catch (uploadError) {
+      setState(`Не удалось загрузить иконку: ${uploadError.message}`, 'error');
+      showToast(`Ошибка иконки: ${uploadError.message}`, 4500);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Выбрать';
+      }
+    }
+  }
+
+  function clearIcon(row) {
+    const current = String(row.dataset.icon || '').trim();
+    row.dataset.icon = '';
+    setIconPreview(row, '');
+    if (current && sessionUploads.has(current)) {
+      sessionUploads.delete(current);
+      cleanupPaths([current]);
+    }
+    setState('Иконка удалена из продукта. После сохранения файл также будет удалён с сервера.');
   }
 
   function buildProductForSave(product, latestById, usedIds) {
@@ -381,26 +543,16 @@
     const hrefId = productIdFromHref(href);
     let id = hrefId || slugify(title);
     if (!id) throw new Error(`Не удалось определить ID для продукта «${title}».`);
-    let base = id;
+    const base = id;
     let suffix = 2;
     while (usedIds.has(id) || latestById.has(id)) id = `${base}-${suffix++}`;
     usedIds.add(id);
 
     return {
-      id,
-      category: categoryId,
-      title,
-      icon: String(product.icon || '').trim(),
-      status: '',
-      version: '',
-      shortDescription: String(product.shortDescription || '').trim(),
-      description: '',
-      href,
-      cover: '',
-      gallery: [],
-      features: [],
-      specs: [],
-      links: { primaryLabel: '', primaryUrl: '' }
+      id, category: categoryId, title,
+      icon: String(product.icon || '').trim(), status: '', version: '',
+      shortDescription: String(product.shortDescription || '').trim(), description: '', href,
+      cover: '', gallery: [], features: [], specs: [], links: { primaryLabel: '', primaryUrl: '' }
     };
   }
 
@@ -415,7 +567,6 @@
   async function save() {
     if (saving || !category) return;
     syncWorkingFromRows();
-
     saving = true;
     const saveButton = q('#category-page-editor-save');
     if (saveButton) {
@@ -428,7 +579,6 @@
       const latest = await fetchCatalog();
       const latestCategory = (latest.categories || []).find(item => item.id === categoryId);
       if (!latestCategory) throw new Error('Категория больше не существует.');
-
       latestCategory.description = q('#category-page-description-input')?.value.trim() || '';
       latest.products = mergeWorkingProducts(Array.isArray(latest.products) ? latest.products : []);
 
@@ -441,6 +591,7 @@
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
 
+      sessionUploads.clear();
       const visibleDescription = q('#category-description');
       if (visibleDescription) visibleDescription.textContent = latestCategory.description;
       setState('Страница категории и продукты сохранены и опубликованы.', 'ok');
@@ -451,7 +602,10 @@
           saveButton.disabled = false;
           saveButton.textContent = 'Сохранить';
         }
-        closeEditor();
+        const overlay = q('#category-page-editor-overlay');
+        overlay?.classList.remove('open');
+        overlay?.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
         location.reload();
       }, 650);
       return;
@@ -488,24 +642,15 @@
       if (!row) return;
       if (event.target.closest('.category-page-product-icon-pick')) {
         event.preventDefault();
-        const opening = !row.classList.contains('icon-picker-open');
-        closeIconPickers(row);
-        row.classList.toggle('icon-picker-open', opening);
+        pendingIconRow = row;
+        const input = q('#category-product-icon-file');
+        input.value = '';
+        input.click();
         return;
       }
       if (event.target.closest('.category-page-product-icon-clear')) {
         event.preventDefault();
-        row.dataset.icon = '';
-        q('.category-page-product-icon-value', row).textContent = '';
-        row.classList.remove('icon-picker-open');
-        return;
-      }
-      const choice = event.target.closest('.category-page-icon-choice');
-      if (choice) {
-        event.preventDefault();
-        row.dataset.icon = choice.dataset.icon || '';
-        q('.category-page-product-icon-value', row).textContent = row.dataset.icon;
-        row.classList.remove('icon-picker-open');
+        clearIcon(row);
         return;
       }
       if (event.target.closest('.category-page-product-up')) {
@@ -524,6 +669,13 @@
       }
     });
 
+    q('#category-product-icon-file')?.addEventListener('change', event => {
+      const file = event.target.files?.[0];
+      const row = pendingIconRow;
+      pendingIconRow = null;
+      if (file && row?.isConnected) uploadIconForRow(row, file);
+    });
+
     q('#category-page-site-pages-list')?.addEventListener('click', event => {
       const link = event.target.closest('.category-page-site-page');
       if (!link || !activeHrefInput) return;
@@ -540,10 +692,6 @@
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && q('#category-page-editor-overlay')?.classList.contains('open')) {
         event.preventDefault();
-        if (qa('.category-page-product-row-fields.icon-picker-open').length) {
-          closeIconPickers();
-          return;
-        }
         closeEditor();
       }
     });
