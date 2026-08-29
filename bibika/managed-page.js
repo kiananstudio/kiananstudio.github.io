@@ -1,6 +1,7 @@
 (() => {
   const API_URL = '/api/catalog';
   const q = selector => document.querySelector(selector);
+  let latestCatalog = null;
 
   function pageId() {
     return String(new URLSearchParams(location.search).get('page') || '').trim().toLowerCase();
@@ -98,6 +99,15 @@
     else renderText(page, host);
   }
 
+  function hideHeaderEditorBehindPageDialog() {
+    const headerOverlay = q('#header-editor-overlay');
+    if (headerOverlay) {
+      headerOverlay.classList.remove('open');
+      headerOverlay.setAttribute('aria-hidden', 'true');
+    }
+    document.body.classList.remove('header-editor-open');
+  }
+
   function openCurrentPageEditor() {
     const id = pageId();
     q('#edit-site-header')?.click();
@@ -109,8 +119,10 @@
       if (button) {
         clearInterval(timer);
         button.click();
+        hideHeaderEditorBehindPageDialog();
       } else if (attempts > 40) {
         clearInterval(timer);
+        hideHeaderEditorBehindPageDialog();
         const toast = q('#bibika-toast');
         if (toast) {
           toast.textContent = 'Не удалось открыть редактор этой страницы.';
@@ -121,7 +133,100 @@
     }, 75);
   }
 
-  q('#edit-managed-page')?.addEventListener('click', openCurrentPageEditor);
+  function sitePageItems(data) {
+    const fixed = [
+      { title: 'Home', href: './', badge: 'Существующая' },
+      { title: 'Unity Tools', href: 'category.html?category=unity-tools', badge: 'Существующая' },
+      { title: 'Games', href: 'category.html?category=games', badge: 'Существующая' },
+      { title: '3D Assets', href: 'category.html?category=3d-assets', badge: 'Существующая' },
+      { title: 'About', href: 'about.html', badge: 'Существующая' },
+      { title: 'Contact', href: 'contact.html', badge: 'Существующая' }
+    ];
+    const managed = normalizePages(data?.sitePages).map(page => ({
+      title: page.title,
+      href: `page.html?page=${encodeURIComponent(page.id)}`,
+      badge: page.type === 'categories' ? 'Категории' : 'Текст',
+      id: page.id
+    }));
+    return [...fixed, ...managed];
+  }
+
+  function renderSitePagesSection(data) {
+    const body = q('#header-page-create-overlay .header-page-create-body');
+    if (!body) return;
+
+    let section = q('#managed-editor-site-pages');
+    if (!section) {
+      section = document.createElement('section');
+      section.id = 'managed-editor-site-pages';
+      section.className = 'managed-editor-site-pages';
+      section.innerHTML = '<div class="managed-editor-site-pages-head"><strong>Страницы сайта</strong><span>Переходи между страницами внутри Bibika.</span></div><div class="managed-editor-site-pages-list"></div>';
+      body.appendChild(section);
+    }
+
+    const editingExistingPage = !!q('#header-page-id')?.disabled;
+    section.hidden = !editingExistingPage;
+    if (!editingExistingPage) return;
+
+    const list = section.querySelector('.managed-editor-site-pages-list');
+    list.replaceChildren();
+    const currentId = pageId();
+
+    sitePageItems(data).forEach(item => {
+      const link = document.createElement('a');
+      link.className = 'managed-editor-site-page';
+      link.href = item.href;
+      const isCurrent = item.id && item.id === currentId;
+      if (isCurrent) {
+        link.classList.add('current');
+        link.setAttribute('aria-current', 'page');
+      }
+
+      const main = document.createElement('span');
+      main.className = 'managed-editor-site-page-main';
+      const strong = document.createElement('strong');
+      strong.textContent = item.title;
+      const path = document.createElement('span');
+      path.textContent = item.href;
+      main.append(strong, path);
+
+      const badge = document.createElement('span');
+      badge.className = 'managed-editor-site-page-badge';
+      badge.textContent = isCurrent ? 'Текущая' : item.badge;
+      link.append(main, badge);
+      list.appendChild(link);
+    });
+  }
+
+  async function refreshSitePagesSection() {
+    if (!q('#header-page-create-overlay')?.classList.contains('open')) return;
+    try {
+      const response = await fetch(`${API_URL}?t=${Date.now()}`, { cache: 'no-store', credentials: 'same-origin' });
+      if (response.ok) latestCatalog = await response.json();
+    } catch {
+      // Keep the latest successfully loaded catalog.
+    }
+    if (latestCatalog) renderSitePagesSection(latestCatalog);
+  }
+
+  function bindPageEditorEnhancements() {
+    const overlay = q('#header-page-create-overlay');
+    if (!overlay) return;
+    const observer = new MutationObserver(() => {
+      if (overlay.classList.contains('open')) {
+        setTimeout(refreshSitePagesSection, 0);
+      }
+    });
+    observer.observe(overlay, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  q('#edit-managed-page')?.addEventListener('click', event => {
+    event.preventDefault();
+    event.stopPropagation();
+    openCurrentPageEditor();
+  });
+
+  window.addEventListener('DOMContentLoaded', bindPageEditorEnhancements, { once: true });
 
   fetch(`${API_URL}?t=${Date.now()}`, { cache: 'no-store', credentials: 'same-origin' })
     .then(response => {
@@ -129,6 +234,7 @@
       return response.json();
     })
     .then(data => {
+      latestCatalog = data;
       const page = normalizePages(data?.sitePages).find(item => item.id === pageId());
       if (!page) renderNotFound();
       else renderPage(page);
