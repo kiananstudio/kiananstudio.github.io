@@ -21,6 +21,11 @@
     return `${PUBLIC_ORIGIN}/${path.replace(/^\/+/, '')}`;
   }
 
+  function isImageIcon(value) {
+    const path = String(value || '').trim();
+    return /^https?:\/\//i.test(path) || /^(?:assets\/|\/assets\/)/i.test(path) || /\.(webp|png|jpe?g)(?:[?#].*)?$/i.test(path);
+  }
+
   function safeHref(product) {
     const href = String(product?.href || `product.html?id=${encodeURIComponent(product?.id || '')}`).trim();
     if (!href || /^(javascript|data|vbscript):/i.test(href)) return `product.html?id=${encodeURIComponent(product?.id || '')}`;
@@ -46,11 +51,16 @@
       }
 
       list.innerHTML = products.map(product => {
-        const visual = product.cover
-          ? `<img src="${escapeHtml(assetUrl(product.cover))}" alt="${escapeHtml(product.title)}" loading="lazy">`
-          : product.icon
-            ? `<div class="item-placeholder">${escapeHtml(product.icon)}</div>`
-            : `<div class="item-placeholder">${escapeHtml(product.title.slice(0,2).toUpperCase())}</div>`;
+        let visual;
+        if (product.icon && isImageIcon(product.icon)) {
+          visual = `<img class="catalog-product-icon" src="${escapeHtml(assetUrl(product.icon))}" alt="${escapeHtml(product.title)} icon" loading="lazy">`;
+        } else if (product.cover) {
+          visual = `<img src="${escapeHtml(assetUrl(product.cover))}" alt="${escapeHtml(product.title)}" loading="lazy">`;
+        } else if (product.icon) {
+          visual = `<div class="item-placeholder">${escapeHtml(product.icon)}</div>`;
+        } else {
+          visual = `<div class="item-placeholder">${escapeHtml(product.title.slice(0,2).toUpperCase())}</div>`;
+        }
         return `<a class="catalog-item" href="${escapeHtml(safeHref(product))}">
           <div class="catalog-thumb">${visual}</div>
           <div class="catalog-item-copy">
