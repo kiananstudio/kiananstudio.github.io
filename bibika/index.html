@@ -9,19 +9,32 @@
   <link rel="icon" type="image/png" href="https://kiananstudio.com/assets/icons/favicon.png" />
   <link rel="stylesheet" href="https://kiananstudio.com/styles.css" />
   <link rel="stylesheet" href="https://kiananstudio.com/layout-v2.css" />
-  <link rel="stylesheet" href="visual-home.css?v=3" />
+  <link rel="stylesheet" href="visual-home.css?v=4" />
   <script defer src="visual-home.js?v=2"></script>
 </head>
 <body>
+  <div class="bibika-adminbar" aria-label="Панель Bibika">
+    <div class="bibika-adminbar-inner">
+      <a class="bibika-brand" href="./" aria-label="Kianan Bibika home">
+        <img src="https://kiananstudio.com/assets/images/kianan-studio-logo.webp" alt="Kianan Studio" />
+        <span class="bibika-brand-name"><strong>Kianan</strong><small>Bibika</small></span>
+      </a>
+      <div class="bibika-actions">
+        <button class="button button-secondary" id="bibika-refresh" type="button">Обновить из GitHub</button>
+        <a class="button button-secondary" href="https://kiananstudio.com" target="_blank" rel="noreferrer">Открыть сайт ↗</a>
+      </div>
+    </div>
+  </div>
+
   <header class="site-header" id="top">
     <div class="nav-shell">
-      <a class="brand" href="./" aria-label="Kianan Bibika home">
+      <a class="brand" href="https://kiananstudio.com/" target="_blank" rel="noreferrer" aria-label="Kianan Studio home">
         <img class="brand-logo" src="https://kiananstudio.com/assets/images/kianan-studio-logo.webp" alt="Kianan Studio" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'" />
         <span class="brand-mark brand-fallback" style="display:none">K</span>
-        <span class="brand-name"><strong>Kianan</strong><small>Bibika</small></span>
+        <span class="brand-name"><strong>Kianan</strong><small>Studio</small></span>
       </a>
-      <button class="nav-toggle" aria-label="Открыть навигацию" aria-expanded="false">☰</button>
-      <nav class="nav-links" aria-label="Навигация Kianan Studio">
+      <button class="nav-toggle" aria-label="Open navigation" aria-expanded="false">☰</button>
+      <nav class="nav-links" aria-label="Main navigation">
         <a href="https://kiananstudio.com/category.html?category=unity-tools" target="_blank" rel="noreferrer">Unity Tools</a>
         <a href="https://kiananstudio.com/category.html?category=games" target="_blank" rel="noreferrer">Games</a>
         <a href="https://kiananstudio.com/category.html?category=3d-assets" target="_blank" rel="noreferrer">3D Assets</a>
@@ -30,11 +43,6 @@
       </nav>
     </div>
   </header>
-
-  <div class="bibika-toolbar" aria-label="Управление Bibika">
-    <button class="button button-secondary" id="bibika-refresh" type="button">Обновить из GitHub</button>
-    <a class="button button-secondary" href="https://kiananstudio.com" target="_blank" rel="noreferrer">Открыть сайт ↗</a>
-  </div>
 
   <main>
     <section class="home-banner-section">
