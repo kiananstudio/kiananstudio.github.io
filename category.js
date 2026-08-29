@@ -20,6 +20,11 @@
     return href;
   };
 
+  const isImageIcon = value => {
+    const path = String(value || '').trim();
+    return /^https?:\/\//i.test(path) || /^(?:assets\/|\/assets\/)/i.test(path) || /\.(webp|png|jpe?g)(?:[?#].*)?$/i.test(path);
+  };
+
   fetch('data/products.json', { cache: 'no-store' })
     .then(r => {
       if (!r.ok) throw new Error(`Catalog load failed: ${r.status}`);
@@ -38,11 +43,16 @@
       }
 
       list.innerHTML = products.map(product => {
-        const visual = product.cover
-          ? `<img src="${escapeHtml(product.cover)}" alt="${escapeHtml(product.title)}" loading="lazy">`
-          : product.icon
-            ? `<div class="item-placeholder">${escapeHtml(product.icon)}</div>`
-            : `<div class="item-placeholder">${escapeHtml(product.title.slice(0,2).toUpperCase())}</div>`;
+        let visual;
+        if (product.icon && isImageIcon(product.icon)) {
+          visual = `<img class="catalog-product-icon" src="${escapeHtml(product.icon)}" alt="${escapeHtml(product.title)} icon" loading="lazy">`;
+        } else if (product.cover) {
+          visual = `<img src="${escapeHtml(product.cover)}" alt="${escapeHtml(product.title)}" loading="lazy">`;
+        } else if (product.icon) {
+          visual = `<div class="item-placeholder">${escapeHtml(product.icon)}</div>`;
+        } else {
+          visual = `<div class="item-placeholder">${escapeHtml(product.title.slice(0,2).toUpperCase())}</div>`;
+        }
         return `<a class="catalog-item" href="${escapeHtml(safeHref(product))}">
           <div class="catalog-thumb">${visual}</div>
           <div class="catalog-item-copy">
