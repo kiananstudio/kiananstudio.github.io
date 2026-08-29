@@ -9,35 +9,34 @@
   <link rel="icon" type="image/png" href="https://kiananstudio.com/assets/icons/favicon.png" />
   <link rel="stylesheet" href="https://kiananstudio.com/styles.css" />
   <link rel="stylesheet" href="https://kiananstudio.com/layout-v2.css" />
-  <link rel="stylesheet" href="visual-home.css?v=2" />
-  <script defer src="visual-home.js?v=1"></script>
+  <link rel="stylesheet" href="visual-home.css?v=3" />
+  <script defer src="visual-home.js?v=2"></script>
 </head>
 <body>
-  <header class="bibika-header">
-    <div class="bibika-header-inner">
-      <a class="bibika-brand" href="./" aria-label="Kianan Bibika">
-        <img src="https://kiananstudio.com/assets/images/kianan-studio-logo.webp" alt="Kianan Studio" />
-        <span class="bibika-brand-name"><strong>Kianan</strong><small>Bibika</small></span>
+  <header class="site-header" id="top">
+    <div class="nav-shell">
+      <a class="brand" href="./" aria-label="Kianan Bibika home">
+        <img class="brand-logo" src="https://kiananstudio.com/assets/images/kianan-studio-logo.webp" alt="Kianan Studio" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'" />
+        <span class="brand-mark brand-fallback" style="display:none">K</span>
+        <span class="brand-name"><strong>Kianan</strong><small>Bibika</small></span>
       </a>
-
-      <nav class="bibika-site-nav" aria-label="Навигация Kianan Studio">
+      <button class="nav-toggle" aria-label="Открыть навигацию" aria-expanded="false">☰</button>
+      <nav class="nav-links" aria-label="Навигация Kianan Studio">
         <a href="https://kiananstudio.com/category.html?category=unity-tools" target="_blank" rel="noreferrer">Unity Tools</a>
         <a href="https://kiananstudio.com/category.html?category=games" target="_blank" rel="noreferrer">Games</a>
         <a href="https://kiananstudio.com/category.html?category=3d-assets" target="_blank" rel="noreferrer">3D Assets</a>
         <a href="https://kiananstudio.com/about.html" target="_blank" rel="noreferrer">About</a>
         <a href="https://kiananstudio.com/contact.html" target="_blank" rel="noreferrer">Contact</a>
       </nav>
-
-      <div class="bibika-actions">
-        <button class="button button-secondary" id="bibika-refresh" type="button">Обновить из GitHub</button>
-        <a class="button button-secondary" href="https://kiananstudio.com" target="_blank" rel="noreferrer">Открыть сайт ↗</a>
-      </div>
     </div>
   </header>
 
-  <main>
-    <div class="bibika-mode-note"><strong>Режим редактирования.</strong> Страница повторяет главную Kianan Studio. Кнопки «Редактировать» будут открывать окна-вставки для конкретных блоков.</div>
+  <div class="bibika-toolbar" aria-label="Управление Bibika">
+    <button class="button button-secondary" id="bibika-refresh" type="button">Обновить из GitHub</button>
+    <a class="button button-secondary" href="https://kiananstudio.com" target="_blank" rel="noreferrer">Открыть сайт ↗</a>
+  </div>
 
+  <main>
     <section class="home-banner-section">
       <div class="home-banner-wrap admin-block">
         <button class="admin-edit" type="button" data-edit-block="Главный баннер">✎ Редактировать</button>
