@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow,noarchive" />
+  <meta name="theme-color" content="#080d12" />
+  <title>Kianan Bibika — Page</title>
+  <link rel="icon" type="image/png" href="https://kiananstudio.com/assets/icons/favicon.png" />
+  <link rel="stylesheet" href="https://kiananstudio.com/styles.css" />
+  <link rel="stylesheet" href="https://kiananstudio.com/layout-v2.css" />
+  <link rel="stylesheet" href="https://kiananstudio.com/site-page.css?v=1" />
+  <link rel="stylesheet" href="visual-home.css?v=7" />
+  <link rel="stylesheet" href="header-editor.css?v=2" />
+  <link rel="stylesheet" href="header-page-content.css?v=2" />
+  <link rel="stylesheet" href="footer-editor.css?v=1" />
+  <link rel="stylesheet" href="bibika-page-mirror.css?v=1" />
+  <script defer src="bibika-navigation.js?v=1"></script>
+  <script defer src="header-editor.js?v=4"></script>
+  <script defer src="footer-editor.js?v=1"></script>
+  <script defer src="managed-page.js?v=1"></script>
+</head>
+<body>
+  <div class="bibika-adminbar" aria-label="Панель Bibika">
+    <div class="bibika-adminbar-inner">
+      <a class="bibika-brand" href="./" aria-label="Kianan Bibika home"><img src="https://kiananstudio.com/assets/images/kianan-studio-logo.webp" alt="Kianan Studio" /><span class="bibika-brand-name"><strong>Kianan</strong><small>Bibika</small></span></a>
+      <div class="bibika-actions"><button class="button button-secondary" id="bibika-refresh" type="button">Обновить из GitHub</button><a class="button button-secondary" data-bibika-public="true" href="https://kiananstudio.com" target="_blank" rel="noreferrer">Открыть сайт ↗</a></div>
+    </div>
+  </div>
+
+  <header class="site-header">
+    <div class="nav-shell">
+      <a class="brand" href="./" aria-label="Kianan Studio home"><img class="brand-logo" src="https://kiananstudio.com/assets/images/kianan-studio-logo.webp" alt="Kianan Studio" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'" /><span class="brand-mark brand-fallback" style="display:none">K</span><span class="brand-name"><strong>Kianan</strong><small>Studio</small></span></a>
+      <nav class="nav-links product-nav"><a href="category.html?category=unity-tools">Unity Tools</a><a href="category.html?category=games">Games</a><a href="category.html?category=3d-assets">3D Assets</a><a href="about.html">About</a><a href="contact.html">Contact</a></nav>
+    </div>
+    <button class="header-edit-trigger" id="edit-site-header" type="button" aria-label="Редактировать Header" title="Редактировать Header"><span class="mirrored-pencil" aria-hidden="true">✎</span></button>
+  </header>
+
+  <main>
+    <section class="section bibika-page-edit-shell" id="managed-page">
+      <button class="bibika-page-edit-trigger" id="edit-managed-page" type="button" aria-label="Редактировать страницу" title="Редактировать страницу"><span class="mirrored-pencil" aria-hidden="true">✎</span></button>
+      <div class="section-heading standalone-heading"><span class="eyebrow">Kianan Studio</span><h1 class="catalog-page-title" id="managed-page-title">Page</h1><p id="managed-page-description" hidden></p></div>
+      <div id="managed-page-content"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer footer-admin-shell"><div class="footer-inner"><div class="footer-brand"><strong>Kianan Studio</strong><span>Unity tools, 3D assets and games.</span></div><p>© <span id="year"></span> Kianan Studio. All rights reserved.</p></div><button class="footer-edit-trigger" id="edit-site-footer" type="button" aria-label="Редактировать Footer" title="Редактировать Footer"><span class="mirrored-pencil" aria-hidden="true">✎</span></button></footer>
+  <div class="bibika-toast" id="bibika-toast" role="status" aria-live="polite"></div>
+</body>
+</html>
