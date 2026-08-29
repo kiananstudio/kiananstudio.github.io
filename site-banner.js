@@ -7,8 +7,26 @@
 
   function safeImage(value) {
     const src = String(value || '').trim();
-    if (!src || /^(javascript|data|vbscript):/i.test(src)) return DEFAULT_BANNER.image;
+    if (!src || /^(javascript|data|vbscript):/i.test(src)) return '';
     return src;
+  }
+
+  function applyBanner(imageValue, altValue) {
+    const image = safeImage(imageValue);
+    const alt = String(altValue || DEFAULT_BANNER.alt).trim() || DEFAULT_BANNER.alt;
+    document.querySelectorAll('.home-banner').forEach((node) => {
+      const wrap = node.parentElement;
+      if (!image) {
+        node.removeAttribute('src');
+        node.style.display = 'none';
+        wrap?.classList.add('banner-placeholder');
+        return;
+      }
+      node.src = image;
+      node.alt = alt;
+      node.style.display = '';
+      wrap?.classList.remove('banner-placeholder');
+    });
   }
 
   async function loadBanner() {
@@ -16,12 +34,8 @@
       const response = await fetch(DATA_URL, { cache: 'no-store' });
       if (!response.ok) return;
       const data = await response.json();
-      const image = safeImage(data?.siteBanner?.image);
-      const alt = String(data?.siteBanner?.alt || DEFAULT_BANNER.alt).trim() || DEFAULT_BANNER.alt;
-      document.querySelectorAll('.home-banner').forEach((node) => {
-        node.src = image;
-        node.alt = alt;
-      });
+      if (!data?.siteBanner || !Object.prototype.hasOwnProperty.call(data.siteBanner, 'image')) return;
+      applyBanner(data.siteBanner.image, data.siteBanner.alt);
     } catch {
       // Keep the static HTML banner as a safe fallback.
     }
