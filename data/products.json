@@ -61,7 +61,8 @@
       "links": {
         "primaryLabel": "View on Unity Asset Store",
         "primaryUrl": "https://assetstore.unity.com/packages/slug/398482"
-      }
+      },
+      "icon": ""
     },
     {
       "id": "3deditor",
@@ -79,7 +80,8 @@
       "links": {
         "primaryLabel": "",
         "primaryUrl": ""
-      }
+      },
+      "icon": "assets/images/3deditor-icon-20260829225303-61b9bfa1.webp"
     }
   ],
   "siteHeader": {
