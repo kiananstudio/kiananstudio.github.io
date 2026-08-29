@@ -11,6 +11,15 @@
     return String(new URLSearchParams(location.search).get('page') || '').trim().toLowerCase();
   }
 
+  function normalizeCard(card) {
+    return {
+      title: String(card?.title || '').trim(),
+      description: String(card?.description || '').trim(),
+      icon: String(card?.icon || '').trim(),
+      href: String(card?.href || '').trim()
+    };
+  }
+
   function normalizePages(value) {
     if (!Array.isArray(value)) return [];
     return value
@@ -23,6 +32,7 @@
           type,
           heading: String(item?.heading || title).trim() || title,
           content: String(item?.content ?? item?.description ?? '').trim(),
+          cards: Array.isArray(item?.cards) ? item.cards.map(normalizeCard).filter((card) => card.title) : [],
           categoryIds: Array.isArray(item?.categoryIds)
             ? item.categoryIds.map((id) => String(id || '').trim()).filter(Boolean)
             : []
@@ -39,6 +49,12 @@
       description: String(item?.description || '').trim(),
       icon: String(item?.icon || DEFAULT_ICONS[item?.id] || '').trim()
     })).filter((item) => item.id && item.title);
+  }
+
+  function safeHref(value) {
+    const href = String(value || '').trim();
+    if (!href || /^(javascript|data|vbscript):/i.test(href)) return '';
+    return href;
   }
 
   function renderFooter(data) {
@@ -76,39 +92,55 @@
     host.hidden = !page.content;
   }
 
-  function renderCategoryContent(page, host, categories) {
-    host.className = 'managed-page-content managed-page-categories';
-    const chosen = page.categoryIds.length
-      ? page.categoryIds.map((id) => categories.find((category) => category.id === id)).filter(Boolean)
-      : categories;
+  function legacyCards(page, categories) {
+    if (!page.categoryIds.length) return [];
+    return page.categoryIds.map((id) => {
+      const category = categories.find((item) => item.id === id);
+      if (!category) return null;
+      return {
+        title: category.title,
+        description: category.description,
+        icon: category.icon,
+        href: `category.html?category=${encodeURIComponent(category.id)}`
+      };
+    }).filter(Boolean);
+  }
 
-    const grid = document.createElement('div');
-    grid.className = 'category-grid home-category-grid';
-    chosen.forEach((category) => {
-      const link = document.createElement('a');
-      link.className = 'category-card category-link';
-      link.href = `category.html?category=${encodeURIComponent(category.id)}`;
+  function renderCategoryCard(card) {
+    const href = safeHref(card.href);
+    const node = document.createElement(href ? 'a' : 'div');
+    node.className = `category-card category-link${href ? '' : ' managed-page-category-static'}`;
+    if (href) node.href = href;
 
-      const icon = document.createElement('span');
-      icon.className = 'category-icon';
-      icon.textContent = category.icon;
+    const icon = document.createElement('span');
+    icon.className = 'category-icon';
+    icon.textContent = card.icon;
 
-      const copy = document.createElement('span');
-      const strong = document.createElement('strong');
-      strong.textContent = category.title;
-      const small = document.createElement('small');
-      small.textContent = category.description;
-      copy.append(strong, small);
+    const copy = document.createElement('span');
+    const strong = document.createElement('strong');
+    strong.textContent = card.title;
+    const small = document.createElement('small');
+    small.textContent = card.description;
+    copy.append(strong, small);
 
+    node.append(icon, copy);
+    if (href) {
       const arrow = document.createElement('span');
       arrow.className = 'catalog-arrow';
       arrow.textContent = '→';
-      link.append(icon, copy, arrow);
-      grid.appendChild(link);
-    });
+      node.appendChild(arrow);
+    }
+    return node;
+  }
 
+  function renderCategoryContent(page, host, categories) {
+    host.className = 'managed-page-content managed-page-categories';
+    const cards = page.cards.length ? page.cards : legacyCards(page, categories);
+    const grid = document.createElement('div');
+    grid.className = 'category-grid home-category-grid';
+    cards.forEach((card) => grid.appendChild(renderCategoryCard(card)));
     host.replaceChildren(grid);
-    host.hidden = !chosen.length;
+    host.hidden = !cards.length;
   }
 
   function renderPage(page, data) {
