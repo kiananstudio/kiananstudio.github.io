@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" href="https://kiananstudio.com/assets/icons/favicon.png" />
   <link rel="stylesheet" href="https://kiananstudio.com/styles.css" />
   <link rel="stylesheet" href="https://kiananstudio.com/layout-v2.css" />
-  <link rel="stylesheet" href="visual-home.css?v=5" />
+  <link rel="stylesheet" href="visual-home.css?v=6" />
   <link rel="stylesheet" href="header-editor.css?v=1" />
   <script defer src="visual-home.js?v=2"></script>
   <script defer src="header-editor.js?v=1"></script>
@@ -61,9 +61,8 @@
       </div>
     </section>
 
-    <section class="section categories-section" id="categories">
-      <div class="section-heading admin-block">
-        <button class="admin-edit" type="button" data-edit-block="Заголовок категорий">✎ Редактировать</button>
+    <section class="section categories-section category-admin-shell" id="categories">
+      <div class="section-heading">
         <span class="eyebrow">Browse</span>
         <h2>Choose a category.</h2>
         <p>Open a category to view its tools, games or 3D assets.</p>
@@ -71,7 +70,6 @@
 
       <div class="category-grid home-category-grid">
         <div class="admin-category-wrap" data-category-id="unity-tools">
-          <button class="admin-edit" type="button" data-edit-block="Unity Tools">✎ Редактировать</button>
           <a class="category-card category-link" href="https://kiananstudio.com/category.html?category=unity-tools" target="_blank" rel="noreferrer">
             <span class="category-icon">◇</span>
             <span><strong data-category-title>Unity Tools</strong><small data-category-description>Editor tools and extensions for Unity workflows.</small></span>
@@ -80,7 +78,6 @@
         </div>
 
         <div class="admin-category-wrap" data-category-id="games">
-          <button class="admin-edit" type="button" data-edit-block="Games">✎ Редактировать</button>
           <a class="category-card category-link" href="https://kiananstudio.com/category.html?category=games" target="_blank" rel="noreferrer">
             <span class="category-icon">🎮</span>
             <span><strong data-category-title>Games</strong><small data-category-description>Original games and interactive projects.</small></span>
@@ -89,7 +86,6 @@
         </div>
 
         <div class="admin-category-wrap" data-category-id="3d-assets">
-          <button class="admin-edit" type="button" data-edit-block="3D Assets">✎ Редактировать</button>
           <a class="category-card category-link" href="https://kiananstudio.com/category.html?category=3d-assets" target="_blank" rel="noreferrer">
             <span class="category-icon">⬡</span>
             <span><strong data-category-title>3D Assets</strong><small data-category-description>Reusable 3D content for game development.</small></span>
@@ -97,6 +93,8 @@
           </a>
         </div>
       </div>
+
+      <button class="category-edit-trigger" type="button" data-edit-block="Category" aria-label="Редактировать Category" title="Редактировать Category"><span class="mirrored-pencil" aria-hidden="true">✎</span></button>
     </section>
   </main>
 
