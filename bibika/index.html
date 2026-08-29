@@ -4,276 +4,89 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex,nofollow,noarchive" />
-  <meta name="theme-color" content="#070b10" />
-  <title>Bibika — панель управления Kianan Studio</title>
-  <link rel="stylesheet" href="styles.css" />
-  <script defer src="app-v2.js?v=2"></script>
-  <script defer src="distribution.js?v=2"></script>
-  <script defer src="distribution-hints.js?v=1"></script>
+  <meta name="theme-color" content="#080d12" />
+  <title>Kianan Bibika</title>
+  <link rel="icon" type="image/png" href="https://kiananstudio.com/assets/icons/favicon.png" />
+  <link rel="stylesheet" href="https://kiananstudio.com/styles.css" />
+  <link rel="stylesheet" href="https://kiananstudio.com/layout-v2.css" />
+  <link rel="stylesheet" href="visual-home.css?v=1" />
+  <script defer src="visual-home.js?v=1"></script>
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <a class="brand" href="#dashboard" aria-label="Kianan Studio">
+  <header class="bibika-header">
+    <div class="bibika-header-inner">
+      <a class="bibika-brand" href="./" aria-label="Kianan Bibika">
         <img src="https://kiananstudio.com/assets/images/kianan-studio-logo.webp" alt="Kianan Studio" />
-        <span><strong>Kianan</strong><small>Bibika</small></span>
+        <span class="bibika-brand-name"><strong>Kianan</strong><small>Bibika</small></span>
       </a>
-
-      <nav class="side-nav" aria-label="Разделы панели">
-        <button class="nav-item active" data-view="dashboard"><span>⌂</span>Главная</button>
-        <button class="nav-item" data-view="products"><span>◇</span>Продукты</button>
-      </nav>
-
-      <div class="sidebar-note">
-        <strong>Рабочий режим</strong>
-        <p>Изменения публикуются в GitHub и обновляют каталог Kianan Studio.</p>
+      <div class="bibika-actions">
+        <button class="button button-secondary" id="bibika-refresh" type="button">Обновить из GitHub</button>
+        <a class="button button-secondary" href="https://kiananstudio.com" target="_blank" rel="noreferrer">Открыть сайт ↗</a>
       </div>
-    </aside>
+    </div>
+  </header>
 
-    <main class="main-shell">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Kianan Studio</p>
-          <h1 id="page-title">Панель управления</h1>
+  <main>
+    <div class="bibika-mode-note"><strong>Режим редактирования.</strong> Страница повторяет главную Kianan Studio. Кнопки «Редактировать» будут открывать окна-вставки для конкретных блоков.</div>
+
+    <section class="home-banner-section">
+      <div class="home-banner-wrap admin-block">
+        <button class="admin-edit" type="button" data-edit-block="Главный баннер">✎ Редактировать</button>
+        <img class="home-banner" src="https://kiananstudio.com/assets/images/kianan-banner.webp" alt="Kianan Studio — tools, 3D assets and games" onerror="this.style.display='none';this.parentElement.classList.add('banner-placeholder')" />
+        <div class="banner-placeholder-copy">
+          <span class="eyebrow">Kianan Studio</span>
+          <h1>Tools · Assets · Games</h1>
         </div>
-        <div class="top-actions">
-          <button class="btn btn-ghost" id="reset-local">Обновить из GitHub</button>
-          <a class="btn btn-ghost" href="https://kiananstudio.com" target="_blank" rel="noreferrer">Открыть сайт ↗</a>
-          <button class="btn btn-primary" id="add-product-top">+ Добавить продукт</button>
-        </div>
-      </header>
-
-      <section class="view active" id="view-dashboard">
-        <div class="status-banner">
-          <div>
-            <strong>Bibika подключена к GitHub</strong>
-            <span>Сохранение, добавление и удаление продуктов публикуют изменения в data/products.json.</span>
-          </div>
-          <span class="status-pill">LIVE</span>
-        </div>
-
-        <div class="stats-grid">
-          <article class="stat-card">
-            <span>Всего продуктов</span>
-            <strong id="stat-total">0</strong>
-          </article>
-          <article class="stat-card">
-            <span>Unity Tools</span>
-            <strong id="stat-unity">0</strong>
-          </article>
-          <article class="stat-card">
-            <span>3D Assets</span>
-            <strong id="stat-assets">0</strong>
-          </article>
-          <article class="stat-card">
-            <span>Games</span>
-            <strong id="stat-games">0</strong>
-          </article>
-        </div>
-
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">Каталог</p>
-              <h2>Последние продукты</h2>
-            </div>
-            <button class="btn btn-secondary" data-go-products>Показать все продукты</button>
-          </div>
-          <div id="dashboard-products" class="product-list"></div>
-        </section>
-      </section>
-
-      <section class="view" id="view-products">
-        <section class="panel">
-          <div class="panel-head products-head">
-            <div>
-              <p class="eyebrow">Управление каталогом</p>
-              <h2>Продукты</h2>
-              <p class="muted">Название и описание продукта вводятся так, как они должны отображаться на публичном сайте.</p>
-            </div>
-            <div class="filter-row">
-              <label>
-                <span>Категория</span>
-                <select id="category-filter">
-                  <option value="all">Все категории</option>
-                  <option value="unity-tools">Unity Tools</option>
-                  <option value="3d-assets">3D Assets</option>
-                  <option value="games">Games</option>
-                </select>
-              </label>
-              <label>
-                <span>Поиск</span>
-                <input id="product-search" type="search" placeholder="Например, 3D Collider" />
-              </label>
-            </div>
-          </div>
-          <div id="products-list" class="product-list"></div>
-        </section>
-      </section>
-    </main>
-  </div>
-
-  <div class="modal-backdrop" id="editor-modal" aria-hidden="true">
-    <section class="modal editor-modal" role="dialog" aria-modal="true" aria-labelledby="editor-title">
-      <div class="modal-head">
-        <div>
-          <p class="eyebrow">Редактор продукта</p>
-          <h2 id="editor-title">Добавить продукт</h2>
-        </div>
-        <button class="icon-btn" id="close-editor" aria-label="Закрыть">×</button>
-      </div>
-
-      <form id="product-form">
-        <input type="hidden" id="editing-index" value="" />
-
-        <div class="editor-grid">
-          <div class="form-column">
-            <section class="form-section">
-              <h3>Основная информация</h3>
-              <div class="field-grid two">
-                <label class="field">
-                  <span>Название продукта</span>
-                  <input id="f-title" required placeholder="3D Collider" />
-                  <small>Это название увидят посетители сайта.</small>
-                </label>
-                <label class="field">
-                  <span>ID / slug</span>
-                  <input id="f-id" required placeholder="3d-collider" />
-                  <small>Технический идентификатор без пробелов.</small>
-                </label>
-              </div>
-
-              <div class="field-grid three">
-                <label class="field">
-                  <span>Категория</span>
-                  <select id="f-category" required>
-                    <option value="unity-tools">Unity Tools</option>
-                    <option value="3d-assets">3D Assets</option>
-                    <option value="games">Games</option>
-                  </select>
-                </label>
-                <label class="field">
-                  <span>Статус</span>
-                  <input id="f-status" placeholder="Unity Asset Store" />
-                </label>
-                <label class="field">
-                  <span>Версия</span>
-                  <input id="f-version" placeholder="1.0.0" />
-                </label>
-              </div>
-
-              <label class="field">
-                <span>Краткое описание</span>
-                <textarea id="f-short" rows="3" placeholder="Короткий текст для карточки продукта."></textarea>
-                <small>Этот текст отображается в списках и карточках.</small>
-              </label>
-
-              <label class="field">
-                <span>Полное описание</span>
-                <textarea id="f-description" rows="6" placeholder="Полное описание продукта для отдельной страницы."></textarea>
-              </label>
-            </section>
-
-            <section class="form-section">
-              <div class="section-line">
-                <div>
-                  <h3>Особенности</h3>
-                  <p>Список преимуществ и возможностей продукта.</p>
-                </div>
-                <button type="button" class="btn btn-small btn-secondary" id="add-feature">+ Добавить пункт</button>
-              </div>
-              <div id="features-editor" class="repeat-list"></div>
-            </section>
-
-            <section class="form-section">
-              <div class="section-line">
-                <div>
-                  <h3>Характеристики</h3>
-                  <p>Например: версия Unity, платформы, render pipelines.</p>
-                </div>
-                <button type="button" class="btn btn-small btn-secondary" id="add-spec">+ Добавить характеристику</button>
-              </div>
-              <div id="specs-editor" class="repeat-list"></div>
-            </section>
-
-            <section class="form-section">
-              <h3>Изображения</h3>
-              <label class="field">
-                <span>Обложка</span>
-                <input id="f-cover" placeholder="assets/images/product-cover.webp" />
-                <small>Укажи путь к изображению на сайте. Загрузку файлов добавим отдельным этапом.</small>
-              </label>
-              <div class="section-line compact">
-                <div>
-                  <h4>Галерея</h4>
-                  <p>Дополнительные изображения страницы продукта.</p>
-                </div>
-                <button type="button" class="btn btn-small btn-secondary" id="add-gallery">+ Добавить изображение</button>
-              </div>
-              <div id="gallery-editor" class="repeat-list"></div>
-            </section>
-
-            <section class="form-section">
-              <h3>Основная кнопка</h3>
-              <div class="field-grid two">
-                <label class="field">
-                  <span>Текст кнопки</span>
-                  <input id="f-primary-label" placeholder="View on Unity Asset Store" />
-                </label>
-                <label class="field">
-                  <span>Ссылка кнопки</span>
-                  <input id="f-primary-url" type="url" placeholder="https://..." />
-                </label>
-              </div>
-            </section>
-          </div>
-
-          <aside class="preview-column">
-            <div class="preview-sticky">
-              <p class="eyebrow">Предпросмотр</p>
-              <article class="preview-card">
-                <div class="preview-cover" id="preview-cover-wrap">
-                  <img id="preview-cover" alt="" />
-                  <span id="preview-placeholder">K</span>
-                </div>
-                <div class="preview-body">
-                  <div class="preview-meta">
-                    <span id="preview-category">Unity Tools</span>
-                    <span id="preview-version">—</span>
-                  </div>
-                  <h3 id="preview-title">Новый продукт</h3>
-                  <p id="preview-short">Заполните краткое описание, чтобы увидеть его здесь.</p>
-                  <span class="preview-status" id="preview-status">Статус не указан</span>
-                </div>
-              </article>
-              <p class="preview-help">Предпросмотр показывает, как основные данные будут выглядеть на карточке сайта.</p>
-            </div>
-          </aside>
-        </div>
-
-        <footer class="modal-actions">
-          <span id="form-state" class="form-state">После сохранения изменения будут опубликованы в GitHub и на сайте.</span>
-          <div>
-            <button type="button" class="btn btn-ghost" id="cancel-editor">Отмена</button>
-            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
-          </div>
-        </footer>
-      </form>
-    </section>
-  </div>
-
-  <div class="modal-backdrop" id="delete-modal" aria-hidden="true">
-    <section class="modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-title">
-      <div class="danger-icon">!</div>
-      <h2 id="delete-title">Удалить продукт?</h2>
-      <p id="delete-copy">Это действие удалит продукт с публичного сайта.</p>
-      <div class="confirm-actions">
-        <button class="btn btn-ghost" id="cancel-delete">Отмена</button>
-        <button class="btn btn-danger" id="confirm-delete">Удалить</button>
       </div>
     </section>
-  </div>
 
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <section class="section categories-section" id="categories">
+      <div class="section-heading admin-block">
+        <button class="admin-edit" type="button" data-edit-block="Заголовок категорий">✎ Редактировать</button>
+        <span class="eyebrow">Browse</span>
+        <h2>Choose a category.</h2>
+        <p>Open a category to view its tools, games or 3D assets.</p>
+      </div>
+
+      <div class="category-grid home-category-grid">
+        <div class="admin-category-wrap" data-category-id="unity-tools">
+          <button class="admin-edit" type="button" data-edit-block="Unity Tools">✎ Редактировать</button>
+          <a class="category-card category-link" href="https://kiananstudio.com/category.html?category=unity-tools" target="_blank" rel="noreferrer">
+            <span class="category-icon">◇</span>
+            <span><strong data-category-title>Unity Tools</strong><small data-category-description>Editor tools and extensions for Unity workflows.</small></span>
+            <span class="catalog-arrow">→</span>
+          </a>
+        </div>
+
+        <div class="admin-category-wrap" data-category-id="games">
+          <button class="admin-edit" type="button" data-edit-block="Games">✎ Редактировать</button>
+          <a class="category-card category-link" href="https://kiananstudio.com/category.html?category=games" target="_blank" rel="noreferrer">
+            <span class="category-icon">🎮</span>
+            <span><strong data-category-title>Games</strong><small data-category-description>Original games and interactive projects.</small></span>
+            <span class="catalog-arrow">→</span>
+          </a>
+        </div>
+
+        <div class="admin-category-wrap" data-category-id="3d-assets">
+          <button class="admin-edit" type="button" data-edit-block="3D Assets">✎ Редактировать</button>
+          <a class="category-card category-link" href="https://kiananstudio.com/category.html?category=3d-assets" target="_blank" rel="noreferrer">
+            <span class="category-icon">⬡</span>
+            <span><strong data-category-title>3D Assets</strong><small data-category-description>Reusable 3D content for game development.</small></span>
+            <span class="catalog-arrow">→</span>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer admin-block">
+    <button class="admin-edit" type="button" data-edit-block="Подвал сайта">✎ Редактировать</button>
+    <div class="footer-inner">
+      <div class="footer-brand"><strong>Kianan Studio</strong><span>Unity tools, 3D assets and games.</span></div>
+      <p>© <span id="year"></span> Kianan Studio. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <div class="bibika-toast" id="bibika-toast" role="status" aria-live="polite"></div>
 </body>
 </html>
