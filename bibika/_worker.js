@@ -6,7 +6,7 @@ const IMAGE_DIR = "assets/images";
 const GITHUB_API = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${CATALOG_PATH}`;
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_CLEANUP_PATHS = 30;
-const BIBIKA_IMAGE_RE = /^assets\/images\/[a-z0-9-]+-(cover|gallery)-\d{14}-[a-f0-9]{8}\.webp$/;
+const BIBIKA_IMAGE_RE = /^assets\/images\/[a-z0-9-]+-(cover|gallery|icon)-\d{14}-[a-f0-9]{8}\.webp$/;
 
 function unauthorized() {
   return new Response("Authentication required", {
@@ -41,12 +41,8 @@ function githubHeaders(env) {
 
 function decodeBase64Utf8(value) {
   const binary = atob(String(value || "").replace(/\s/g, ""));
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
   return new TextDecoder().decode(bytes);
-}
-
-function encodeBase64Utf8(value) {
-  return encodeBytesBase64(new TextEncoder().encode(value));
 }
 
 function encodeBytesBase64(bytes) {
@@ -56,6 +52,10 @@ function encodeBytesBase64(bytes) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
   }
   return btoa(binary);
+}
+
+function encodeBase64Utf8(value) {
+  return encodeBytesBase64(new TextEncoder().encode(value));
 }
 
 function sanitizeSlug(value, fallback = "product") {
@@ -79,11 +79,14 @@ function isBibikaManagedImage(path) {
 
 function collectCatalogImages(data) {
   const result = new Set();
-  const siteBanner = normalizeImagePath(data?.siteBanner?.image);
-  if (siteBanner) result.add(siteBanner);
+  const banner = normalizeImagePath(data?.siteBanner?.image);
+  if (banner) result.add(banner);
+
   for (const product of data?.products || []) {
     const cover = normalizeImagePath(product?.cover);
+    const icon = normalizeImagePath(product?.icon);
     if (cover) result.add(cover);
+    if (icon) result.add(icon);
     for (const item of Array.isArray(product?.gallery) ? product.gallery : []) {
       const path = normalizeImagePath(item);
       if (path) result.add(path);
@@ -93,18 +96,17 @@ function collectCatalogImages(data) {
 }
 
 function githubContentsUrl(path) {
-  const encodedPath = normalizeImagePath(path)
+  const encoded = normalizeImagePath(path)
     .split("/")
-    .map((part) => encodeURIComponent(part))
+    .map(part => encodeURIComponent(part))
     .join("/");
-  return `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${encodedPath}`;
+  return `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${encoded}`;
 }
 
 function validateCatalog(data) {
   if (!data || typeof data !== "object" || !Array.isArray(data.categories) || !Array.isArray(data.products)) {
     return "Некорректная структура каталога.";
   }
-
   const ids = new Set();
   for (const product of data.products) {
     if (!product || typeof product !== "object" || !String(product.id || "").trim() || !String(product.title || "").trim()) {
@@ -127,29 +129,21 @@ async function getGitHubCatalog(env) {
     error.status = response.status;
     throw error;
   }
-
-  const data = JSON.parse(decodeBase64Utf8(payload.content));
-  return { data, sha: payload.sha };
+  return { data: JSON.parse(decodeBase64Utf8(payload.content)), sha: payload.sha };
 }
 
 async function putGitHubCatalog(env, data, message) {
   const current = await getGitHubCatalog(env);
-  const content = encodeBase64Utf8(`${JSON.stringify(data, null, 2)}\n`);
-
   const response = await fetch(GITHUB_API, {
     method: "PUT",
-    headers: {
-      ...githubHeaders(env),
-      "Content-Type": "application/json; charset=utf-8",
-    },
+    headers: { ...githubHeaders(env), "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({
       message: String(message || "Update website catalog from Bibika").slice(0, 120),
-      content,
+      content: encodeBase64Utf8(`${JSON.stringify(data, null, 2)}\n`),
       sha: current.sha,
       branch: GITHUB_BRANCH,
     }),
   });
-
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(payload.message || `GitHub HTTP ${response.status}`);
@@ -162,17 +156,13 @@ async function putGitHubCatalog(env, data, message) {
 async function putGitHubImage(env, path, bytes, message) {
   const response = await fetch(githubContentsUrl(path), {
     method: "PUT",
-    headers: {
-      ...githubHeaders(env),
-      "Content-Type": "application/json; charset=utf-8",
-    },
+    headers: { ...githubHeaders(env), "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({
       message: String(message || "Bibika: upload image").slice(0, 120),
       content: encodeBytesBase64(bytes),
       branch: GITHUB_BRANCH,
     }),
   });
-
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(payload.message || `GitHub HTTP ${response.status}`);
@@ -211,30 +201,25 @@ async function listBibikaManagedImages(env) {
   }
   if (!Array.isArray(payload)) return [];
   return payload
-    .filter((item) => item?.type === "file" && isBibikaManagedImage(item.path))
-    .map((item) => normalizeImagePath(item.path));
+    .filter(item => item?.type === "file" && isBibikaManagedImage(item.path))
+    .map(item => normalizeImagePath(item.path));
 }
 
 async function deleteGitHubImage(env, path, message) {
   const normalized = normalizeImagePath(path);
   if (!isBibikaManagedImage(normalized)) return { deleted: false, reason: "not-managed" };
-
   const meta = await getGitHubFileMeta(env, normalized);
   if (!meta) return { deleted: false, reason: "missing" };
 
   const response = await fetch(githubContentsUrl(normalized), {
     method: "DELETE",
-    headers: {
-      ...githubHeaders(env),
-      "Content-Type": "application/json; charset=utf-8",
-    },
+    headers: { ...githubHeaders(env), "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({
       message: String(message || "Bibika: remove unused image").slice(0, 120),
       sha: meta.sha,
       branch: GITHUB_BRANCH,
     }),
   });
-
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(payload.message || `GitHub HTTP ${response.status}`);
@@ -268,20 +253,15 @@ async function cleanupCandidates(env, candidates, referencedImages = null) {
       failed.push({ path, error: error.message });
     }
   }
-
   return { deleted, skipped, failed };
 }
 
 async function cleanupAllOrphanedImages(env, catalogData) {
   const refs = collectCatalogImages(catalogData);
   const managed = await listBibikaManagedImages(env);
-  const orphaned = managed.filter((path) => !refs.has(path));
+  const orphaned = managed.filter(path => !refs.has(path));
   const result = await cleanupCandidates(env, orphaned, refs);
-  return {
-    ...result,
-    found: orphaned.length,
-    remaining: Math.max(0, orphaned.length - MAX_CLEANUP_PATHS),
-  };
+  return { ...result, found: orphaned.length, remaining: Math.max(0, orphaned.length - MAX_CLEANUP_PATHS) };
 }
 
 async function handleCatalogApi(request, env) {
@@ -303,37 +283,24 @@ async function handleCatalogApi(request, env) {
     } catch {
       return jsonResponse({ error: "Некорректный JSON." }, 400);
     }
-
-    const errorMessage = validateCatalog(body?.data);
-    if (errorMessage) return jsonResponse({ error: errorMessage }, 400);
+    const validationError = validateCatalog(body?.data);
+    if (validationError) return jsonResponse({ error: validationError }, 400);
 
     let result;
     try {
       result = await putGitHubCatalog(env, body.data, body.message);
     } catch (error) {
-      const status = error.status === 409 ? 409 : 502;
-      return jsonResponse({ error: `Не удалось опубликовать изменения в GitHub: ${error.message}` }, status);
+      return jsonResponse({ error: `Не удалось опубликовать изменения в GitHub: ${error.message}` }, error.status === 409 ? 409 : 502);
     }
 
     let cleanup;
     try {
       cleanup = await cleanupAllOrphanedImages(env, body.data);
     } catch (error) {
-      cleanup = {
-        deleted: [],
-        skipped: [],
-        failed: [{ path: "*", error: error.message }],
-        found: null,
-        remaining: null,
-      };
+      cleanup = { deleted: [], skipped: [], failed: [{ path: "*", error: error.message }], found: null, remaining: null };
     }
 
-    return jsonResponse({
-      ok: true,
-      commit: result.commit?.sha || null,
-      url: result.commit?.html_url || null,
-      cleanup,
-    });
+    return jsonResponse({ ok: true, commit: result.commit?.sha || null, url: result.commit?.html_url || null, cleanup });
   }
 
   return jsonResponse({ error: "Method not allowed." }, 405);
@@ -344,45 +311,28 @@ async function handleImageApi(request, env) {
   if (request.method !== "POST") return jsonResponse({ error: "Method not allowed." }, 405);
 
   const contentType = String(request.headers.get("Content-Type") || "").split(";", 1)[0].trim().toLowerCase();
-  if (contentType !== "image/webp") {
-    return jsonResponse({ error: "Bibika принимает на сервер только подготовленный WEBP." }, 415);
-  }
+  if (contentType !== "image/webp") return jsonResponse({ error: "Bibika принимает на сервер только подготовленный WEBP." }, 415);
 
   const productId = sanitizeSlug(request.headers.get("X-Bibika-Product"));
   const target = String(request.headers.get("X-Bibika-Target") || "").toLowerCase();
-  if (target !== "cover" && target !== "gallery") {
+  if (!new Set(["cover", "gallery", "icon"]).has(target)) {
     return jsonResponse({ error: "Некорректное назначение изображения." }, 400);
   }
 
   const declaredLength = Number(request.headers.get("Content-Length") || 0);
-  if (declaredLength > MAX_IMAGE_BYTES) {
-    return jsonResponse({ error: "Готовое изображение слишком большое. Максимум 4 МБ." }, 413);
-  }
+  if (declaredLength > MAX_IMAGE_BYTES) return jsonResponse({ error: "Готовое изображение слишком большое. Максимум 4 МБ." }, 413);
 
   const buffer = await request.arrayBuffer();
   if (!buffer.byteLength) return jsonResponse({ error: "Пустой файл изображения." }, 400);
-  if (buffer.byteLength > MAX_IMAGE_BYTES) {
-    return jsonResponse({ error: "Готовое изображение слишком большое. Максимум 4 МБ." }, 413);
-  }
+  if (buffer.byteLength > MAX_IMAGE_BYTES) return jsonResponse({ error: "Готовое изображение слишком большое. Максимум 4 МБ." }, 413);
 
   const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
   const suffix = crypto.randomUUID().slice(0, 8);
   const path = `${IMAGE_DIR}/${productId}-${target}-${stamp}-${suffix}.webp`;
 
   try {
-    const result = await putGitHubImage(
-      env,
-      path,
-      new Uint8Array(buffer),
-      `Bibika: upload ${target} for ${productId}`
-    );
-    return jsonResponse({
-      ok: true,
-      path,
-      bytes: buffer.byteLength,
-      commit: result.commit?.sha || null,
-      url: result.content?.html_url || null,
-    });
+    const result = await putGitHubImage(env, path, new Uint8Array(buffer), `Bibika: upload ${target} for ${productId}`);
+    return jsonResponse({ ok: true, path, bytes: buffer.byteLength, commit: result.commit?.sha || null, url: result.content?.html_url || null });
   } catch (error) {
     return jsonResponse({ error: `Не удалось загрузить изображение в GitHub: ${error.message}` }, 502);
   }
@@ -404,8 +354,7 @@ async function handleImageCleanupApi(request, env) {
   if (paths.length > MAX_CLEANUP_PATHS) return jsonResponse({ error: "Слишком много файлов для очистки за один запрос." }, 400);
 
   try {
-    const result = await cleanupCandidates(env, paths);
-    return jsonResponse({ ok: true, ...result });
+    return jsonResponse({ ok: true, ...(await cleanupCandidates(env, paths)) });
   } catch (error) {
     return jsonResponse({ error: `Не удалось очистить изображения: ${error.message}` }, 502);
   }
@@ -414,14 +363,10 @@ async function handleImageCleanupApi(request, env) {
 async function handleRequest(request, env) {
   const expectedUser = env.BIBIKA_USER;
   const expectedPassword = env.BIBIKA_PASSWORD;
-
   if (!expectedUser || !expectedPassword) {
     return new Response("Bibika authentication is not configured.", {
       status: 503,
-      headers: {
-        "Cache-Control": "no-store",
-        "X-Content-Type-Options": "nosniff",
-      },
+      headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
     });
   }
 
@@ -434,13 +379,9 @@ async function handleRequest(request, env) {
   } catch {
     return unauthorized();
   }
-
   const separator = credentials.indexOf(":");
   if (separator < 0) return unauthorized();
-
-  const username = credentials.slice(0, separator);
-  const password = credentials.slice(separator + 1);
-  if (username !== expectedUser || password !== expectedPassword) return unauthorized();
+  if (credentials.slice(0, separator) !== expectedUser || credentials.slice(separator + 1) !== expectedPassword) return unauthorized();
 
   const url = new URL(request.url);
   if (url.pathname === "/api/catalog") return handleCatalogApi(request, env);
@@ -457,10 +398,7 @@ async function handleRequest(request, env) {
   const contentType = response.headers.get("Content-Type") || "";
   if (contentType.includes("text/html")) {
     const html = await response.text();
-    const imageEditor = `<script defer src="/image-editor.js?v=1"></script>`;
-    const imageCleanup = `<script defer src="/image-cleanup.js?v=1"></script>`;
-    const hotfix = `<script>window.addEventListener("DOMContentLoaded",function(){try{publishData=function(nextState,message){return requestJson("/api/catalog",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({data:nextState,message:message})});};}catch(e){console.error("Bibika publish hotfix",e);}});</script>`;
-    const additions = `${imageEditor}${imageCleanup}${hotfix}`;
+    const additions = `<script defer src="/image-editor.js?v=1"></script><script defer src="/image-cleanup.js?v=1"></script><script>window.addEventListener("DOMContentLoaded",function(){try{publishData=function(nextState,message){return requestJson("/api/catalog",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({data:nextState,message:message})});};}catch(e){console.error("Bibika publish hotfix",e);}});</script>`;
     const patched = html.includes("</body>") ? html.replace("</body>", `${additions}</body>`) : `${html}${additions}`;
     return new Response(patched, { status: response.status, statusText: response.statusText, headers });
   }
@@ -479,10 +417,7 @@ export default {
       }
       return new Response("Bibika Worker error", {
         status: 500,
-        headers: {
-          "Cache-Control": "no-store",
-          "Content-Type": "text/plain; charset=utf-8",
-        },
+        headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" },
       });
     }
   },
