@@ -13,12 +13,19 @@
     { title: 'About', path: 'about.html', managed: false },
     { title: 'Contact', path: 'contact.html', managed: false }
   ];
+  const LOGICAL_PAGES = [
+    { title: 'Unity Tools', path: 'category.html?category=unity-tools', managed: false },
+    { title: 'Games', path: 'category.html?category=games', managed: false },
+    { title: '3D Assets', path: 'category.html?category=3d-assets', managed: false }
+  ];
   const HIDDEN_TEMPLATE_PAGES = new Set(['category.html', 'product.html', 'page.html', '404.html']);
 
   let workingLinks = [];
   let workingPages = [];
+  let workingCategories = [];
   let repositoryPages = [...FALLBACK_REPO_PAGES];
   let saving = false;
+  let editingPageId = null;
 
   const q = (selector, root = document) => root.querySelector(selector);
   const qa = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -43,13 +50,32 @@
   function normalizePages(value) {
     if (!Array.isArray(value)) return [];
     return value
-      .map((item) => ({
-        id: String(item?.id || '').trim().toLowerCase(),
-        title: String(item?.title || '').trim(),
-        description: String(item?.description || '').trim(),
-        managed: true
-      }))
+      .map((item) => {
+        const title = String(item?.title || '').trim();
+        const type = item?.type === 'categories' ? 'categories' : 'text';
+        return {
+          id: String(item?.id || '').trim().toLowerCase(),
+          title,
+          type,
+          heading: String(item?.heading || title).trim() || title,
+          content: String(item?.content ?? item?.description ?? '').trim(),
+          categoryIds: Array.isArray(item?.categoryIds)
+            ? item.categoryIds.map((id) => String(id || '').trim()).filter(Boolean)
+            : [],
+          managed: true
+        };
+      })
       .filter((item) => /^[a-z0-9-]+$/.test(item.id) && item.title);
+  }
+
+  function normalizeCategories(value) {
+    if (!Array.isArray(value)) return [];
+    return value.map((item) => ({
+      id: String(item?.id || '').trim(),
+      title: String(item?.title || '').trim(),
+      description: String(item?.description || '').trim(),
+      icon: String(item?.icon || '').trim()
+    })).filter((item) => item.id && item.title);
   }
 
   function slugify(value) {
@@ -117,6 +143,17 @@
     }
   }
 
+  function protectedPages() {
+    const result = [];
+    const seen = new Set();
+    [...repositoryPages, ...LOGICAL_PAGES].forEach((page) => {
+      if (!page.path || seen.has(page.path)) return;
+      seen.add(page.path);
+      result.push(page);
+    });
+    return result;
+  }
+
   function allPageOptions() {
     const managed = workingPages.map((page) => ({
       title: page.title,
@@ -125,7 +162,7 @@
       id: page.id
     }));
     const seen = new Set(managed.map((item) => item.path));
-    const existing = repositoryPages.filter((item) => !seen.has(item.path));
+    const existing = protectedPages().filter((item) => !seen.has(item.path));
     return [...managed, ...existing];
   }
 
@@ -153,11 +190,10 @@
     if (!select) return;
     select.innerHTML = '<option value="">Выбери страницу</option>';
 
-    const managed = workingPages;
-    if (managed.length) {
+    if (workingPages.length) {
       const group = document.createElement('optgroup');
       group.label = 'Страницы Bibika';
-      managed.forEach((page) => {
+      workingPages.forEach((page) => {
         const option = document.createElement('option');
         option.value = managedPageHref(page.id);
         option.textContent = `${page.title} — ${managedPageHref(page.id)}`;
@@ -166,10 +202,11 @@
       select.appendChild(group);
     }
 
-    if (repositoryPages.length) {
+    const existingPages = protectedPages();
+    if (existingPages.length) {
       const group = document.createElement('optgroup');
       group.label = 'Существующие страницы сайта';
-      repositoryPages.forEach((page) => {
+      existingPages.forEach((page) => {
         const option = document.createElement('option');
         option.value = page.path;
         option.textContent = `${page.title} — ${page.path}`;
@@ -238,9 +275,7 @@
     qa('.header-link-row', q('#header-links-editor')).forEach((row) => {
       const mode = q('.header-link-mode', row)?.value || 'link';
       const current = mode === 'page' ? q('.header-page-select', row)?.value || row.dataset.href : row.dataset.href;
-      if (mode === 'page') {
-        fillPageSelect(q('.header-page-select', row), current);
-      }
+      if (mode === 'page') fillPageSelect(q('.header-page-select', row), current);
     });
   }
 
@@ -287,6 +322,7 @@
       const [catalog] = await Promise.all([fetchCatalog(), fetchRepositoryPages()]);
       workingLinks = normalizeLinks(catalog?.siteHeader?.links);
       workingPages = normalizePages(catalog?.sitePages);
+      workingCategories = normalizeCategories(catalog?.categories);
       renderBibikaHeader(workingLinks);
       renderPagesManager();
       if (updateRows) renderRows(workingLinks);
@@ -323,6 +359,10 @@
     document.body.classList.remove('header-editor-open');
   }
 
+  function pageTypeLabel(page) {
+    return page.type === 'categories' ? 'Категории' : 'Текст';
+  }
+
   function renderPagesManager() {
     const list = q('#header-pages-list');
     if (!list) return;
@@ -337,14 +377,16 @@
           <strong></strong>
           <span></span>
         </div>
-        <span class="header-page-badge">Bibika</span>
+        <span class="header-page-badge header-page-type-badge"></span>
+        <button type="button" class="header-page-edit" title="Редактировать содержимое страницы" aria-label="Редактировать содержимое страницы"><span class="mirrored-pencil" aria-hidden="true">✎</span></button>
         <button type="button" class="header-page-delete" title="Удалить страницу" aria-label="Удалить страницу">×</button>`;
       q('strong', row).textContent = page.title;
       q('.header-page-row-main span', row).textContent = managedPageHref(page.id);
+      q('.header-page-type-badge', row).textContent = pageTypeLabel(page);
       list.appendChild(row);
     });
 
-    repositoryPages.forEach((page) => {
+    protectedPages().forEach((page) => {
       const row = document.createElement('div');
       row.className = 'header-page-row';
       row.innerHTML = `
@@ -360,27 +402,95 @@
     });
   }
 
-  function openCreatePage() {
+  function renderCategoryPicker(selectedIds = []) {
+    const host = q('#header-page-category-picker');
+    if (!host) return;
+    const selected = new Set(selectedIds);
+    host.innerHTML = '';
+    if (!workingCategories.length) {
+      host.innerHTML = '<span class="header-page-category-empty">Категории не найдены.</span>';
+      return;
+    }
+    workingCategories.forEach((category) => {
+      const label = document.createElement('label');
+      label.className = 'header-page-category-choice';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.value = category.id;
+      input.checked = selectedIds.length ? selected.has(category.id) : true;
+      const copy = document.createElement('span');
+      const strong = document.createElement('strong');
+      strong.textContent = category.title;
+      const small = document.createElement('small');
+      small.textContent = category.description || category.id;
+      copy.append(strong, small);
+      label.append(input, copy);
+      host.appendChild(label);
+    });
+  }
+
+  function syncPageContentFields() {
+    const type = q('#header-page-content-type')?.value || 'text';
+    const textFields = q('#header-page-text-fields');
+    const categoryFields = q('#header-page-category-fields');
+    if (textFields) textFields.hidden = type !== 'text';
+    if (categoryFields) categoryFields.hidden = type !== 'categories';
+  }
+
+  function openPageDialog(page = null) {
     const overlay = q('#header-page-create-overlay');
     if (!overlay) return;
-    q('#header-page-title').value = '';
-    q('#header-page-id').value = '';
+    editingPageId = page?.id || null;
+    const isEdit = !!page;
+    const title = page?.title || '';
+    const type = page?.type || 'text';
+    const heading = page?.heading || title;
+
+    q('#header-page-create-title').textContent = isEdit ? 'Редактировать страницу' : 'Создать страницу';
+    q('#header-page-create-eyebrow').textContent = isEdit ? 'Страница Bibika' : 'Новая страница';
+    q('#header-page-title').value = title;
+    q('#header-page-id').value = page?.id || '';
+    q('#header-page-id').disabled = isEdit;
+    q('#header-page-id').dataset.touched = isEdit ? '1' : '';
+    q('#header-page-content-type').value = type;
+    q('#header-page-heading').value = heading;
+    q('#header-page-text').value = page?.content || '';
     q('#header-page-create-state').textContent = '';
+    q('#header-page-create-confirm').textContent = isEdit ? 'Применить' : 'Создать';
+    renderCategoryPicker(page?.categoryIds || []);
+    syncPageContentFields();
     overlay.classList.add('open');
     overlay.setAttribute('aria-hidden', 'false');
     setTimeout(() => q('#header-page-title')?.focus(), 0);
+  }
+
+  function openCreatePage() {
+    openPageDialog(null);
   }
 
   function closeCreatePage() {
     const overlay = q('#header-page-create-overlay');
     overlay?.classList.remove('open');
     overlay?.setAttribute('aria-hidden', 'true');
+    editingPageId = null;
   }
 
-  function createManagedPage() {
+  function collectSelectedCategoryIds() {
+    return qa('#header-page-category-picker input[type="checkbox"]:checked')
+      .map((input) => input.value)
+      .filter(Boolean);
+  }
+
+  function applyManagedPage() {
     const title = q('#header-page-title')?.value.trim() || '';
-    const id = slugify(q('#header-page-id')?.value || title);
+    const existing = editingPageId ? workingPages.find((page) => page.id === editingPageId) : null;
+    const id = existing?.id || slugify(q('#header-page-id')?.value || title);
+    const type = q('#header-page-content-type')?.value === 'categories' ? 'categories' : 'text';
+    const heading = q('#header-page-heading')?.value.trim() || title;
+    const content = q('#header-page-text')?.value.trim() || '';
+    const categoryIds = type === 'categories' ? collectSelectedCategoryIds() : [];
     const state = q('#header-page-create-state');
+
     if (!title) {
       if (state) state.textContent = 'Укажи название страницы.';
       return;
@@ -389,13 +499,38 @@
       if (state) state.textContent = 'Адрес страницы должен содержать латинские буквы, цифры и дефисы.';
       return;
     }
-    if (workingPages.some((page) => page.id === id)) {
+    if (!existing && workingPages.some((page) => page.id === id)) {
       if (state) state.textContent = 'Страница с таким адресом уже существует в Bibika.';
+      return;
+    }
+    if (type === 'categories' && !categoryIds.length) {
+      if (state) state.textContent = 'Выбери хотя бы одну категорию.';
+      return;
+    }
+
+    if (existing) {
+      existing.title = title;
+      existing.type = type;
+      existing.heading = heading;
+      existing.content = type === 'text' ? content : '';
+      existing.categoryIds = categoryIds;
+      renderPagesManager();
+      refreshPageSelectors();
+      closeCreatePage();
+      setState(`Страница «${title}» изменена. Нажми «Сохранить».`);
       return;
     }
 
     const href = managedPageHref(id);
-    workingPages.push({ id, title, description: '', managed: true });
+    workingPages.push({
+      id,
+      title,
+      type,
+      heading,
+      content: type === 'text' ? content : '',
+      categoryIds,
+      managed: true
+    });
     renderPagesManager();
     refreshPageSelectors();
 
@@ -458,7 +593,14 @@
     try {
       const catalog = await fetchCatalog();
       catalog.siteHeader = { links };
-      catalog.sitePages = workingPages.map(({ id, title, description }) => ({ id, title, description }));
+      catalog.sitePages = workingPages.map(({ id, title, type, heading, content, categoryIds }) => ({
+        id,
+        title,
+        type,
+        heading,
+        content,
+        categoryIds
+      }));
       const response = await fetch(API_URL, {
         method: 'POST',
         credentials: 'same-origin',
@@ -503,7 +645,7 @@
             <div>
               <span class="header-editor-eyebrow">Редактирование блока</span>
               <h2 id="header-editor-title">Header</h2>
-              <p>Настраивай кнопки Header, выбирай существующие страницы, создавай новые страницы и удаляй страницы, созданные через Bibika.</p>
+              <p>Настраивай кнопки Header, выбирай существующие страницы, создавай новые страницы и выбирай их содержимое.</p>
             </div>
             <button type="button" class="header-editor-close" id="header-editor-close" aria-label="Закрыть">×</button>
           </div>
@@ -518,7 +660,7 @@
 
             <section class="header-editor-section header-pages-section">
               <div class="header-editor-section-head">
-                <div><strong>Страницы сайта</strong><span>Существующие страницы можно выбирать. Удалять можно только страницы, созданные через Bibika.</span></div>
+                <div><strong>Страницы сайта</strong><span>Существующие страницы защищены. Страницы Bibika можно редактировать и удалять.</span></div>
                 <button type="button" class="header-create-page" id="header-create-page">+ Создать страницу</button>
               </div>
               <div class="header-pages-list" id="header-pages-list"></div>
@@ -538,9 +680,9 @@
         <section class="header-page-create-dialog" role="dialog" aria-modal="true" aria-labelledby="header-page-create-title">
           <div class="header-editor-head">
             <div>
-              <span class="header-editor-eyebrow">Новая страница</span>
+              <span class="header-editor-eyebrow" id="header-page-create-eyebrow">Новая страница</span>
               <h2 id="header-page-create-title">Создать страницу</h2>
-              <p>Страница сразу будет добавлена как новая кнопка Header. Содержимое страницы мы подключим к визуальному редактору следующим этапом.</p>
+              <p>Выбери, что будет находиться на странице: обычный текст или блок категорий.</p>
             </div>
             <button type="button" class="header-editor-close" id="header-page-create-close" aria-label="Закрыть">×</button>
           </div>
@@ -552,8 +694,29 @@
             <label class="header-editor-field">
               <span>Адрес страницы</span>
               <div class="header-page-address-row"><span>page.html?page=</span><input id="header-page-id" type="text" autocomplete="off" placeholder="support"></div>
-              <small>Латинские буквы, цифры и дефисы. Можно оставить пустым — адрес создастся из названия.</small>
+              <small>Латинские буквы, цифры и дефисы. После создания адрес страницы не меняется.</small>
             </label>
+            <label class="header-editor-field">
+              <span>Контент страницы</span>
+              <select id="header-page-content-type">
+                <option value="text">Текстовая страница</option>
+                <option value="categories">Блок категорий</option>
+              </select>
+            </label>
+            <label class="header-editor-field">
+              <span>Заголовок на странице</span>
+              <input id="header-page-heading" type="text" autocomplete="off" placeholder="Например, Support">
+            </label>
+            <div id="header-page-text-fields" class="header-page-content-fields">
+              <label class="header-editor-field">
+                <span>Текст</span>
+                <textarea id="header-page-text" rows="8" placeholder="Текст страницы..."></textarea>
+              </label>
+            </div>
+            <div id="header-page-category-fields" class="header-page-content-fields" hidden>
+              <div class="header-page-category-label">Какие категории показывать</div>
+              <div id="header-page-category-picker" class="header-page-category-picker"></div>
+            </div>
             <div class="header-page-create-state" id="header-page-create-state"></div>
           </div>
           <div class="header-editor-footer">
@@ -627,20 +790,33 @@
     q('#header-create-page')?.addEventListener('click', openCreatePage);
     q('#header-page-create-close')?.addEventListener('click', closeCreatePage);
     q('#header-page-create-cancel')?.addEventListener('click', closeCreatePage);
-    q('#header-page-create-confirm')?.addEventListener('click', createManagedPage);
+    q('#header-page-create-confirm')?.addEventListener('click', applyManagedPage);
+    q('#header-page-content-type')?.addEventListener('change', syncPageContentFields);
     q('#header-page-title')?.addEventListener('input', (event) => {
       const id = q('#header-page-id');
-      if (id && !id.dataset.touched) id.value = slugify(event.target.value);
+      const heading = q('#header-page-heading');
+      if (id && !id.dataset.touched && !editingPageId) id.value = slugify(event.target.value);
+      if (heading && !heading.dataset.touched) heading.value = event.target.value;
+    });
+    q('#header-page-heading')?.addEventListener('input', (event) => {
+      event.target.dataset.touched = event.target.value ? '1' : '';
     });
     q('#header-page-id')?.addEventListener('input', (event) => {
       event.target.dataset.touched = event.target.value ? '1' : '';
-      event.target.value = slugify(event.target.value);
+      if (!editingPageId) event.target.value = slugify(event.target.value);
     });
 
     q('#header-pages-list')?.addEventListener('click', (event) => {
-      const button = event.target.closest('.header-page-delete');
-      const row = button?.closest('.header-page-row-managed');
-      if (button && row) deleteManagedPage(row.dataset.pageId);
+      const editButton = event.target.closest('.header-page-edit');
+      const deleteButton = event.target.closest('.header-page-delete');
+      const row = (editButton || deleteButton)?.closest('.header-page-row-managed');
+      if (!row) return;
+      if (editButton) {
+        const page = workingPages.find((item) => item.id === row.dataset.pageId);
+        if (page) openPageDialog(page);
+        return;
+      }
+      if (deleteButton) deleteManagedPage(row.dataset.pageId);
     });
 
     q('#header-editor-overlay')?.addEventListener('click', (event) => {
