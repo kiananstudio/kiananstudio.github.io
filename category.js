@@ -14,6 +14,12 @@
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
 
+  const safeHref = product => {
+    const href = String(product?.href || `product.html?id=${encodeURIComponent(product?.id || '')}`).trim();
+    if (!href || /^(javascript|data|vbscript):/i.test(href)) return `product.html?id=${encodeURIComponent(product?.id || '')}`;
+    return href;
+  };
+
   fetch('data/products.json', { cache: 'no-store' })
     .then(r => {
       if (!r.ok) throw new Error(`Catalog load failed: ${r.status}`);
@@ -34,8 +40,10 @@
       list.innerHTML = products.map(product => {
         const visual = product.cover
           ? `<img src="${escapeHtml(product.cover)}" alt="${escapeHtml(product.title)}" loading="lazy">`
-          : `<div class="item-placeholder">${escapeHtml(product.title.slice(0,2).toUpperCase())}</div>`;
-        return `<a class="catalog-item" href="product.html?id=${encodeURIComponent(product.id)}">
+          : product.icon
+            ? `<div class="item-placeholder">${escapeHtml(product.icon)}</div>`
+            : `<div class="item-placeholder">${escapeHtml(product.title.slice(0,2).toUpperCase())}</div>`;
+        return `<a class="catalog-item" href="${escapeHtml(safeHref(product))}">
           <div class="catalog-thumb">${visual}</div>
           <div class="catalog-item-copy">
             <div class="catalog-meta">${product.status ? `<span>${escapeHtml(product.status)}</span>` : ''}${product.version ? `<span>v${escapeHtml(product.version)}</span>` : ''}</div>
