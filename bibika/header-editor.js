@@ -18,6 +18,7 @@
     { title: 'Games', path: 'category.html?category=games', managed: false },
     { title: '3D Assets', path: 'category.html?category=3d-assets', managed: false }
   ];
+  const ICON_CHOICES = ['◇','◆','⬡','⬢','◈','◎','◉','★','☆','⚙','🛠️','🎮','🧊','📦','🎨','🧩','🚀','💡','📱','💻','🖥️','🎯','🔧','🔷'];
   const HIDDEN_TEMPLATE_PAGES = new Set(['category.html', 'product.html', 'page.html', '404.html']);
 
   let workingLinks = [];
@@ -47,6 +48,15 @@
     return result.length ? result : DEFAULT_LINKS.map((item) => ({ ...item }));
   }
 
+  function normalizeCard(card) {
+    return {
+      title: String(card?.title || '').trim(),
+      description: String(card?.description || '').trim(),
+      icon: String(card?.icon || '').trim(),
+      href: String(card?.href || '').trim()
+    };
+  }
+
   function normalizePages(value) {
     if (!Array.isArray(value)) return [];
     return value
@@ -59,7 +69,8 @@
           type,
           heading: String(item?.heading || title).trim() || title,
           content: String(item?.content ?? item?.description ?? '').trim(),
-          categoryIds: Array.isArray(item?.categoryIds)
+          cards: Array.isArray(item?.cards) ? item.cards.map(normalizeCard).filter((card) => card.title) : [],
+          legacyCategoryIds: Array.isArray(item?.categoryIds)
             ? item.categoryIds.map((id) => String(id || '').trim()).filter(Boolean)
             : [],
           managed: true
@@ -87,9 +98,9 @@
       .slice(0, 60);
   }
 
-  function validateHref(value) {
+  function validateHref(value, { optional = false } = {}) {
     const href = String(value || '').trim();
-    if (!href) return 'У каждой кнопки должен быть указан адрес.';
+    if (!href) return optional ? '' : 'У каждой кнопки должен быть указан адрес.';
     if (/^(javascript|data|vbscript):/i.test(href)) return 'Этот тип ссылки запрещён.';
     return '';
   }
@@ -360,7 +371,9 @@
   }
 
   function pageTypeLabel(page) {
-    return page.type === 'categories' ? 'Категории' : 'Текст';
+    if (page.type !== 'categories') return 'Текст';
+    const count = page.cards.length || page.legacyCategoryIds.length;
+    return count ? `Категории · ${count}` : 'Категории';
   }
 
   function renderPagesManager() {
@@ -402,30 +415,99 @@
     });
   }
 
-  function renderCategoryPicker(selectedIds = []) {
-    const host = q('#header-page-category-picker');
+  function legacyCardsFor(page) {
+    if (!page?.legacyCategoryIds?.length) return [];
+    return page.legacyCategoryIds.map((id) => {
+      const category = workingCategories.find((item) => item.id === id);
+      if (!category) return null;
+      return {
+        title: category.title,
+        description: category.description,
+        icon: category.icon,
+        href: `category.html?category=${encodeURIComponent(category.id)}`
+      };
+    }).filter(Boolean);
+  }
+
+  function iconPickerMarkup() {
+    return ICON_CHOICES.map((icon) => `<button type="button" class="header-page-icon-choice" data-icon="${icon}" title="${icon}">${icon}</button>`).join('');
+  }
+
+  function createPageCardRow(card = {}) {
+    const item = normalizeCard(card);
+    const row = document.createElement('div');
+    row.className = 'header-page-card-row';
+    row.innerHTML = `
+      <div class="header-page-card-number"></div>
+      <label class="header-editor-field">
+        <span>Название</span>
+        <input class="header-page-card-title" type="text" autocomplete="off" placeholder="Например, Tutorials">
+      </label>
+      <div class="header-editor-field header-page-card-icon-field">
+        <span>Иконка</span>
+        <div class="header-page-card-icon-control">
+          <span class="header-page-card-icon-value"></span>
+          <button type="button" class="header-page-card-icon-button" title="Выбрать иконку" aria-label="Выбрать иконку">▦</button>
+          <button type="button" class="header-page-card-icon-clear" title="Очистить иконку" aria-label="Очистить иконку">×</button>
+        </div>
+      </div>
+      <label class="header-editor-field">
+        <span>Краткое описание</span>
+        <input class="header-page-card-description" type="text" autocomplete="off" maxlength="180" placeholder="Короткое описание категории">
+      </label>
+      <label class="header-editor-field header-page-card-link-field">
+        <span>Куда ведёт</span>
+        <input class="header-page-card-href" type="text" autocomplete="off" placeholder="Например, page.html?page=tutorials или https://...">
+      </label>
+      <div class="header-page-card-actions">
+        <button type="button" class="header-page-card-action header-page-card-up" title="Переместить выше">↑</button>
+        <button type="button" class="header-page-card-action header-page-card-down" title="Переместить ниже">↓</button>
+        <button type="button" class="header-page-card-action header-page-card-delete" title="Удалить категорию">×</button>
+      </div>
+      <div class="header-page-card-icon-picker">${iconPickerMarkup()}</div>`;
+    q('.header-page-card-title', row).value = item.title;
+    q('.header-page-card-description', row).value = item.description;
+    q('.header-page-card-href', row).value = item.href;
+    row.dataset.icon = item.icon;
+    q('.header-page-card-icon-value', row).textContent = item.icon;
+    return row;
+  }
+
+  function renumberPageCardRows() {
+    const host = q('#header-page-cards-editor');
     if (!host) return;
-    const selected = new Set(selectedIds);
+    const rows = qa('.header-page-card-row', host);
+    rows.forEach((row, index) => {
+      q('.header-page-card-number', row).textContent = `${index + 1}`;
+      q('.header-page-card-up', row).disabled = index === 0;
+      q('.header-page-card-down', row).disabled = index === rows.length - 1;
+    });
+    const empty = q('#header-page-card-empty');
+    if (empty) empty.hidden = rows.length > 0;
+  }
+
+  function renderPageCards(cards = []) {
+    const host = q('#header-page-cards-editor');
+    if (!host) return;
     host.innerHTML = '';
-    if (!workingCategories.length) {
-      host.innerHTML = '<span class="header-page-category-empty">Категории не найдены.</span>';
-      return;
-    }
-    workingCategories.forEach((category) => {
-      const label = document.createElement('label');
-      label.className = 'header-page-category-choice';
-      const input = document.createElement('input');
-      input.type = 'checkbox';
-      input.value = category.id;
-      input.checked = selectedIds.length ? selected.has(category.id) : true;
-      const copy = document.createElement('span');
-      const strong = document.createElement('strong');
-      strong.textContent = category.title;
-      const small = document.createElement('small');
-      small.textContent = category.description || category.id;
-      copy.append(strong, small);
-      label.append(input, copy);
-      host.appendChild(label);
+    cards.forEach((card) => host.appendChild(createPageCardRow(card)));
+    renumberPageCardRows();
+  }
+
+  function collectPageCards() {
+    const host = q('#header-page-cards-editor');
+    if (!host) return [];
+    return qa('.header-page-card-row', host).map((row) => ({
+      title: q('.header-page-card-title', row)?.value.trim() || '',
+      description: q('.header-page-card-description', row)?.value.trim() || '',
+      icon: String(row.dataset.icon || '').trim(),
+      href: q('.header-page-card-href', row)?.value.trim() || ''
+    }));
+  }
+
+  function closeIconPickers(except = null) {
+    qa('.header-page-card-row.icon-picker-open').forEach((row) => {
+      if (row !== except) row.classList.remove('icon-picker-open');
     });
   }
 
@@ -445,6 +527,7 @@
     const title = page?.title || '';
     const type = page?.type || 'text';
     const heading = page?.heading || title;
+    const cards = page ? (page.cards.length ? page.cards : legacyCardsFor(page)) : [];
 
     q('#header-page-create-title').textContent = isEdit ? 'Редактировать страницу' : 'Создать страницу';
     q('#header-page-create-eyebrow').textContent = isEdit ? 'Страница Bibika' : 'Новая страница';
@@ -454,11 +537,13 @@
     q('#header-page-id').dataset.touched = isEdit ? '1' : '';
     q('#header-page-content-type').value = type;
     q('#header-page-heading').value = heading;
+    q('#header-page-heading').dataset.touched = isEdit ? '1' : '';
     q('#header-page-text').value = page?.content || '';
     q('#header-page-create-state').textContent = '';
     q('#header-page-create-confirm').textContent = isEdit ? 'Применить' : 'Создать';
-    renderCategoryPicker(page?.categoryIds || []);
+    renderPageCards(cards);
     syncPageContentFields();
+    closeIconPickers();
     overlay.classList.add('open');
     overlay.setAttribute('aria-hidden', 'false');
     setTimeout(() => q('#header-page-title')?.focus(), 0);
@@ -473,12 +558,27 @@
     overlay?.classList.remove('open');
     overlay?.setAttribute('aria-hidden', 'true');
     editingPageId = null;
+    closeIconPickers();
   }
 
-  function collectSelectedCategoryIds() {
-    return qa('#header-page-category-picker input[type="checkbox"]:checked')
-      .map((input) => input.value)
-      .filter(Boolean);
+  function validatePageCards(cards, state) {
+    if (!cards.length) {
+      if (state) state.textContent = 'Добавь хотя бы одну категорию.';
+      return false;
+    }
+    for (let index = 0; index < cards.length; index += 1) {
+      const card = cards[index];
+      if (!card.title) {
+        if (state) state.textContent = `Заполни название категории ${index + 1}.`;
+        return false;
+      }
+      const hrefError = validateHref(card.href, { optional: true });
+      if (hrefError) {
+        if (state) state.textContent = `Категория ${index + 1}: ${hrefError}`;
+        return false;
+      }
+    }
+    return true;
   }
 
   function applyManagedPage() {
@@ -488,7 +588,7 @@
     const type = q('#header-page-content-type')?.value === 'categories' ? 'categories' : 'text';
     const heading = q('#header-page-heading')?.value.trim() || title;
     const content = q('#header-page-text')?.value.trim() || '';
-    const categoryIds = type === 'categories' ? collectSelectedCategoryIds() : [];
+    const cards = type === 'categories' ? collectPageCards() : [];
     const state = q('#header-page-create-state');
 
     if (!title) {
@@ -503,17 +603,15 @@
       if (state) state.textContent = 'Страница с таким адресом уже существует в Bibika.';
       return;
     }
-    if (type === 'categories' && !categoryIds.length) {
-      if (state) state.textContent = 'Выбери хотя бы одну категорию.';
-      return;
-    }
+    if (type === 'categories' && !validatePageCards(cards, state)) return;
 
     if (existing) {
       existing.title = title;
       existing.type = type;
       existing.heading = heading;
       existing.content = type === 'text' ? content : '';
-      existing.categoryIds = categoryIds;
+      existing.cards = cards;
+      existing.legacyCategoryIds = [];
       renderPagesManager();
       refreshPageSelectors();
       closeCreatePage();
@@ -528,7 +626,8 @@
       type,
       heading,
       content: type === 'text' ? content : '',
-      categoryIds,
+      cards,
+      legacyCategoryIds: [],
       managed: true
     });
     renderPagesManager();
@@ -593,13 +692,13 @@
     try {
       const catalog = await fetchCatalog();
       catalog.siteHeader = { links };
-      catalog.sitePages = workingPages.map(({ id, title, type, heading, content, categoryIds }) => ({
+      catalog.sitePages = workingPages.map(({ id, title, type, heading, content, cards }) => ({
         id,
         title,
         type,
         heading,
         content,
-        categoryIds
+        cards: Array.isArray(cards) ? cards.map(normalizeCard) : []
       }));
       const response = await fetch(API_URL, {
         method: 'POST',
@@ -682,7 +781,7 @@
             <div>
               <span class="header-editor-eyebrow" id="header-page-create-eyebrow">Новая страница</span>
               <h2 id="header-page-create-title">Создать страницу</h2>
-              <p>Выбери, что будет находиться на странице: обычный текст или блок категорий.</p>
+              <p>Выбери тип страницы. Для блока категорий ты создаёшь собственные карточки, а не вставляешь категории главной страницы.</p>
             </div>
             <button type="button" class="header-editor-close" id="header-page-create-close" aria-label="Закрыть">×</button>
           </div>
@@ -714,8 +813,12 @@
               </label>
             </div>
             <div id="header-page-category-fields" class="header-page-content-fields" hidden>
-              <div class="header-page-category-label">Какие категории показывать</div>
-              <div id="header-page-category-picker" class="header-page-category-picker"></div>
+              <div class="header-page-categories-head">
+                <div><strong>Категории на этой странице</strong><span>Добавляй свои карточки: название, иконку, описание и ссылку. Порядок можно менять стрелками.</span></div>
+                <button type="button" class="header-page-add-category" id="header-page-add-category">+ Добавить категорию</button>
+              </div>
+              <div id="header-page-cards-editor" class="header-page-cards-editor"></div>
+              <div id="header-page-card-empty" class="header-page-card-empty">Категорий пока нет. Нажми «+ Добавить категорию».</div>
             </div>
             <div class="header-page-create-state" id="header-page-create-state"></div>
           </div>
@@ -806,6 +909,54 @@
       if (!editingPageId) event.target.value = slugify(event.target.value);
     });
 
+    q('#header-page-add-category')?.addEventListener('click', () => {
+      const host = q('#header-page-cards-editor');
+      if (!host) return;
+      const row = createPageCardRow();
+      host.appendChild(row);
+      renumberPageCardRows();
+      q('.header-page-card-title', row)?.focus();
+    });
+
+    q('#header-page-cards-editor')?.addEventListener('click', (event) => {
+      const row = event.target.closest('.header-page-card-row');
+      if (!row) return;
+
+      const iconChoice = event.target.closest('.header-page-icon-choice');
+      if (iconChoice) {
+        row.dataset.icon = iconChoice.dataset.icon || '';
+        q('.header-page-card-icon-value', row).textContent = row.dataset.icon;
+        row.classList.remove('icon-picker-open');
+        return;
+      }
+      if (event.target.closest('.header-page-card-icon-button')) {
+        const willOpen = !row.classList.contains('icon-picker-open');
+        closeIconPickers(row);
+        row.classList.toggle('icon-picker-open', willOpen);
+        return;
+      }
+      if (event.target.closest('.header-page-card-icon-clear')) {
+        row.dataset.icon = '';
+        q('.header-page-card-icon-value', row).textContent = '';
+        row.classList.remove('icon-picker-open');
+        return;
+      }
+      if (event.target.closest('.header-page-card-delete')) {
+        row.remove();
+        renumberPageCardRows();
+        return;
+      }
+      if (event.target.closest('.header-page-card-up') && row.previousElementSibling) {
+        row.parentNode.insertBefore(row, row.previousElementSibling);
+        renumberPageCardRows();
+        return;
+      }
+      if (event.target.closest('.header-page-card-down') && row.nextElementSibling) {
+        row.parentNode.insertBefore(row.nextElementSibling, row);
+        renumberPageCardRows();
+      }
+    });
+
     q('#header-pages-list')?.addEventListener('click', (event) => {
       const editButton = event.target.closest('.header-page-edit');
       const deleteButton = event.target.closest('.header-page-delete');
@@ -826,8 +977,20 @@
       if (event.target === q('#header-page-create-overlay')) closeCreatePage();
     });
 
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest('.header-page-card-icon-control') && !event.target.closest('.header-page-card-icon-picker')) {
+        closeIconPickers();
+      }
+    });
+
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape') return;
+      const openPicker = q('.header-page-card-row.icon-picker-open');
+      if (openPicker) {
+        event.preventDefault();
+        closeIconPickers();
+        return;
+      }
       if (q('#header-page-create-overlay')?.classList.contains('open')) {
         event.preventDefault();
         closeCreatePage();
