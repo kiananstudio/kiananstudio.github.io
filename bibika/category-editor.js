@@ -5,12 +5,20 @@
     games: '🎮',
     '3d-assets': '⬡'
   };
+  const ICON_OPTIONS = [
+    '◇', '◆', '⬡', '⬢', '◈', '◉', '◎', '✦', '✧', '★',
+    '⚙️', '🛠️', '🔧', '🧰', '🎮', '🕹️', '🎲', '🧊', '📦', '🧱',
+    '🧩', '🖥️', '💻', '📱', '🌐', '🚀', '✨', '🧪', '🔬', '🎨',
+    '🧭', '🗂️', '📐', '🧰', '🔷', '🔹'
+  ];
 
   let workingCategories = [];
   let saving = false;
+  let activeIconRow = null;
 
   const q = (selector, root = document) => root.querySelector(selector);
   const qa = (selector, root = document) => [...root.querySelectorAll(selector)];
+  const hasOwn = (object, key) => !!object && Object.prototype.hasOwnProperty.call(object, key);
 
   function showToast(message, duration = 3200) {
     const toast = q('#bibika-toast');
@@ -23,13 +31,19 @@
 
   function normalizeCategories(value) {
     if (!Array.isArray(value)) return [];
-    return value.map((item) => ({
-      ...item,
-      id: String(item?.id || '').trim(),
-      title: String(item?.title || '').trim(),
-      description: String(item?.description || '').trim(),
-      icon: String(item?.icon || DEFAULT_ICONS[item?.id] || '◆').trim() || '◆'
-    })).filter((item) => item.id && item.title);
+    return value.map((item) => {
+      const id = String(item?.id || '').trim();
+      const icon = hasOwn(item, 'icon')
+        ? String(item.icon ?? '').trim()
+        : (DEFAULT_ICONS[id] || '◆');
+      return {
+        ...item,
+        id,
+        title: String(item?.title || '').trim(),
+        description: String(item?.description || '').trim(),
+        icon
+      };
+    }).filter((item) => item.id && item.title);
   }
 
   function publicHref(id) {
@@ -90,6 +104,15 @@
     }
   }
 
+  function updateRowIconPreview(row) {
+    if (!row) return;
+    const value = q('.category-row-icon', row)?.value || '';
+    const preview = q('.category-icon-preview', row);
+    if (!preview) return;
+    preview.textContent = value || '—';
+    preview.classList.toggle('empty', !value);
+  }
+
   function createRow(category) {
     const row = document.createElement('div');
     row.className = 'category-editor-row';
@@ -100,10 +123,15 @@
         <span>Категория</span>
         <strong></strong>
       </div>
-      <label class="category-editor-field category-icon-field">
+      <div class="category-editor-field category-icon-field">
         <span>Иконка</span>
-        <input class="category-row-icon" type="text" autocomplete="off" maxlength="8" aria-label="Иконка категории">
-      </label>
+        <input class="category-row-icon" type="hidden">
+        <div class="category-icon-control">
+          <span class="category-icon-preview" aria-hidden="true"></span>
+          <button type="button" class="category-icon-button category-icon-pick" title="Выбрать иконку" aria-label="Выбрать иконку">▦</button>
+          <button type="button" class="category-icon-button category-icon-clear" title="Очистить иконку" aria-label="Очистить иконку">×</button>
+        </div>
+      </div>
       <label class="category-editor-field category-description-field">
         <span>Краткое описание</span>
         <input class="category-row-description" type="text" autocomplete="off" maxlength="180" aria-label="Краткое описание категории">
@@ -115,6 +143,7 @@
     q('.category-row-title strong', row).textContent = category.title;
     q('.category-row-icon', row).value = category.icon;
     q('.category-row-description', row).value = category.description;
+    updateRowIconPreview(row);
     return row;
   }
 
@@ -141,7 +170,7 @@
       const original = source.get(row.dataset.categoryId) || {};
       return {
         ...original,
-        icon: q('.category-row-icon', row).value.trim() || DEFAULT_ICONS[row.dataset.categoryId] || '◆',
+        icon: q('.category-row-icon', row).value.trim(),
         description: q('.category-row-description', row).value.trim()
       };
     });
@@ -166,10 +195,44 @@
 
   function closeEditor() {
     if (saving) return;
+    closeIconPicker();
     const overlay = q('#category-editor-overlay');
     overlay?.classList.remove('open');
     overlay?.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('category-editor-open');
+  }
+
+  function openIconPicker(row) {
+    if (!row || saving) return;
+    activeIconRow = row;
+    const current = q('.category-row-icon', row)?.value || '';
+    qa('.category-icon-option', q('#category-icon-picker-grid')).forEach((button) => {
+      button.classList.toggle('selected', button.dataset.icon === current);
+    });
+    const picker = q('#category-icon-picker-overlay');
+    picker?.classList.add('open');
+    picker?.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeIconPicker() {
+    activeIconRow = null;
+    const picker = q('#category-icon-picker-overlay');
+    picker?.classList.remove('open');
+    picker?.setAttribute('aria-hidden', 'true');
+  }
+
+  function chooseIcon(icon) {
+    if (!activeIconRow) return;
+    const input = q('.category-row-icon', activeIconRow);
+    if (input) input.value = icon;
+    updateRowIconPreview(activeIconRow);
+    closeIconPicker();
+  }
+
+  function clearIcon(row) {
+    const input = q('.category-row-icon', row);
+    if (input) input.value = '';
+    updateRowIconPreview(row);
   }
 
   async function saveCategories() {
@@ -259,6 +322,35 @@
         </div>
       </section>`;
     document.body.appendChild(overlay);
+
+    const picker = document.createElement('div');
+    picker.id = 'category-icon-picker-overlay';
+    picker.className = 'category-icon-picker-overlay';
+    picker.setAttribute('aria-hidden', 'true');
+    picker.innerHTML = `
+      <section class="category-icon-picker" role="dialog" aria-modal="true" aria-labelledby="category-icon-picker-title">
+        <div class="category-icon-picker-head">
+          <div>
+            <span class="category-editor-eyebrow">Иконка категории</span>
+            <h3 id="category-icon-picker-title">Выбери иконку</h3>
+          </div>
+          <button type="button" class="category-editor-close" id="category-icon-picker-close" aria-label="Закрыть">×</button>
+        </div>
+        <div class="category-icon-picker-grid" id="category-icon-picker-grid"></div>
+      </section>`;
+    document.body.appendChild(picker);
+
+    const grid = q('#category-icon-picker-grid');
+    ICON_OPTIONS.forEach((icon) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'category-icon-option';
+      button.dataset.icon = icon;
+      button.textContent = icon;
+      button.title = `Использовать ${icon}`;
+      button.setAttribute('aria-label', `Использовать иконку ${icon}`);
+      grid.appendChild(button);
+    });
   }
 
   function bind() {
@@ -275,6 +367,14 @@
     q('#category-list-editor')?.addEventListener('click', (event) => {
       const row = event.target.closest('.category-editor-row');
       if (!row) return;
+      if (event.target.closest('.category-icon-pick')) {
+        openIconPicker(row);
+        return;
+      }
+      if (event.target.closest('.category-icon-clear')) {
+        clearIcon(row);
+        return;
+      }
       if (event.target.closest('.category-row-up') && row.previousElementSibling) {
         row.parentNode.insertBefore(row, row.previousElementSibling);
         renumberRows();
@@ -286,11 +386,26 @@
       }
     });
 
+    q('#category-icon-picker-grid')?.addEventListener('click', (event) => {
+      const button = event.target.closest('.category-icon-option');
+      if (button) chooseIcon(button.dataset.icon || '');
+    });
+    q('#category-icon-picker-close')?.addEventListener('click', closeIconPicker);
+    q('#category-icon-picker-overlay')?.addEventListener('click', (event) => {
+      if (event.target === q('#category-icon-picker-overlay')) closeIconPicker();
+    });
+
     q('#category-editor-overlay')?.addEventListener('click', (event) => {
       if (event.target === q('#category-editor-overlay')) closeEditor();
     });
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && q('#category-editor-overlay')?.classList.contains('open')) {
+      if (event.key !== 'Escape') return;
+      if (q('#category-icon-picker-overlay')?.classList.contains('open')) {
+        event.preventDefault();
+        closeIconPicker();
+        return;
+      }
+      if (q('#category-editor-overlay')?.classList.contains('open')) {
         event.preventDefault();
         closeEditor();
       }
