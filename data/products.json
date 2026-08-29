@@ -101,8 +101,21 @@
       {
         "label": "Contact",
         "href": "contact.html"
+      },
+      {
+        "label": "APK",
+        "href": "page.html?page=apk"
       }
     ]
   },
-  "sitePages": []
+  "sitePages": [
+    {
+      "id": "apk",
+      "title": "APK",
+      "type": "categories",
+      "heading": "APK Page",
+      "content": "",
+      "cards": []
+    }
+  ]
 }
