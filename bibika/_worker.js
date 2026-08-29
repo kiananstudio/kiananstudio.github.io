@@ -79,6 +79,8 @@ function isBibikaManagedImage(path) {
 
 function collectCatalogImages(data) {
   const result = new Set();
+  const siteBanner = normalizeImagePath(data?.siteBanner?.image);
+  if (siteBanner) result.add(siteBanner);
   for (const product of data?.products || []) {
     const cover = normalizeImagePath(product?.cover);
     if (cover) result.add(cover);
