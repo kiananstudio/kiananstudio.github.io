@@ -5,6 +5,11 @@
     games: 'Original games and interactive projects.',
     '3d-assets': 'Reusable 3D content for game development.'
   };
+  const fallbackIcons = {
+    'unity-tools': '◇',
+    games: '🎮',
+    '3d-assets': '⬡'
+  };
 
   const toast = document.getElementById('bibika-toast');
   const refreshButton = document.getElementById('bibika-refresh');
@@ -22,8 +27,10 @@
     if (!card) return;
     const title = card.querySelector('[data-category-title]');
     const description = card.querySelector('[data-category-description]');
+    const icon = card.querySelector('.category-icon');
     if (title && category.title) title.textContent = category.title;
-    if (description) description.textContent = fallbackDescriptions[category.id] || category.description || description.textContent;
+    if (description) description.textContent = category.description || fallbackDescriptions[category.id] || description.textContent;
+    if (icon) icon.textContent = category.icon || fallbackIcons[category.id] || icon.textContent;
   }
 
   async function refreshFromGitHub({ announce = true } = {}) {
