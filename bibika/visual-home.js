@@ -55,6 +55,13 @@
     });
   });
 
+  const navToggle = document.querySelector('.nav-toggle');
+  const navLinks = document.querySelector('.nav-links');
+  navToggle?.addEventListener('click', () => {
+    const open = navLinks?.classList.toggle('open');
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
   refreshButton?.addEventListener('click', () => refreshFromGitHub({ announce: true }));
 
   const year = document.getElementById('year');
