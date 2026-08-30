@@ -32,6 +32,12 @@
     return `${value} B`;
   }
 
+  function minimumDisplay(value) {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    return /^(min(?:imum)?\b)/i.test(text) ? text : `Min ${text}`;
+  }
+
   function safeUrl(value) {
     const url = String(value || '').trim();
     return /^https:\/\/github\.com\//i.test(url) || /^https:\/\/objects\.githubusercontent\.com\//i.test(url) ? url : '';
@@ -50,7 +56,7 @@
     heading.textContent = `${PLATFORM_LABELS[file.platform]}${file.version ? ` · v${file.version.replace(/^v/i, '')}` : ''}`;
     const meta = document.createElement('div');
     meta.className = 'managed-page-file-meta';
-    [file.minimum, file.architecture && file.architecture !== 'Не указано' ? file.architecture : '', file.requirements].filter(Boolean).forEach(value => {
+    [minimumDisplay(file.minimum), file.architecture && file.architecture !== 'Не указано' ? file.architecture : '', file.requirements].filter(Boolean).forEach(value => {
       const span = document.createElement('span');
       span.textContent = value;
       meta.appendChild(span);
