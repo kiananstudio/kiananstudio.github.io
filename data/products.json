@@ -108,7 +108,20 @@
       }
     ]
   },
-  "sitePages": [],
+  "sitePages": [
+    {
+      "id": "bronchoscopy",
+      "title": "Bronchoscopy",
+      "type": "text",
+      "heading": "Bronchoscopy",
+      "content": "Bronchoscopy text",
+      "cards": [],
+      "blocks": [],
+      "files": [],
+      "buttonPosition": "side",
+      "buttons": []
+    }
+  ],
   "siteStaticPages": {
     "about": {
       "eyebrow": "About",
