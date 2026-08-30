@@ -5,6 +5,7 @@ const CATALOG_PATH = "data/products.json";
 const IMAGE_DIR = "assets/images";
 const GITHUB_API = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${CATALOG_PATH}`;
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_RELEASE_FILE_BYTES = 90 * 1024 * 1024;
 const MAX_CLEANUP_PATHS = 30;
 const BIBIKA_IMAGE_RE = /^assets\/images\/[a-z0-9-]+-(cover|gallery|icon|page)-\d{14}-[a-f0-9]{8}\.webp$/;
 
@@ -67,6 +68,45 @@ function sanitizeSlug(value, fallback = "product") {
     .replace(/^-+|-+$/g, "")
     .slice(0, 70);
   return result || fallback;
+}
+
+function decodeHeaderValue(value) {
+  try {
+    return decodeURIComponent(String(value || ""));
+  } catch {
+    return String(value || "");
+  }
+}
+
+function sanitizeReleaseVersion(value) {
+  const result = String(value || "")
+    .trim()
+    .replace(/^v/i, "")
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  return result || "1.0.0";
+}
+
+function sanitizeAssetName(value, fallback = "download.bin") {
+  const raw = String(value || "").split(/[\\/]/).pop().trim();
+  const result = raw
+    .replace(/\s+/g, "-")
+    .replace(/[^A-Za-z0-9._+()-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 140);
+  return result || fallback;
+}
+
+function uniqueAssetName(name, assets = []) {
+  const used = new Set((Array.isArray(assets) ? assets : []).map(asset => String(asset?.name || "")));
+  if (!used.has(name)) return name;
+  const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+  const dot = name.lastIndexOf(".");
+  if (dot > 0) return `${name.slice(0, dot)}-${stamp}${name.slice(dot)}`;
+  return `${name}-${stamp}`;
 }
 
 function normalizeImagePath(value) {
@@ -369,6 +409,143 @@ async function handleImageCleanupApi(request, env) {
   }
 }
 
+async function getReleaseByTag(env, tag) {
+  const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tags/${encodeURIComponent(tag)}`, {
+    method: "GET",
+    headers: githubHeaders(env),
+  });
+  if (response.status === 404) return null;
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload.message || `GitHub HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+async function createRelease(env, tag, title, version) {
+  const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases`, {
+    method: "POST",
+    headers: { ...githubHeaders(env), "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify({
+      tag_name: tag,
+      target_commitish: GITHUB_BRANCH,
+      name: `${title} ${version}`.trim(),
+      body: `Application files published from Kianan Bibika for ${title}.`,
+      draft: false,
+      prerelease: false,
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload.message || `GitHub HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+async function getOrCreateRelease(env, tag, title, version) {
+  const existing = await getReleaseByTag(env, tag);
+  if (existing) return existing;
+  return createRelease(env, tag, title, version);
+}
+
+async function handleReleaseUploadApi(request, env) {
+  if (!env.GITHUB_TOKEN) return jsonResponse({ error: "GitHub Releases publishing is not configured." }, 503);
+  if (request.method !== "POST") return jsonResponse({ error: "Method not allowed." }, 405);
+  if (!request.body) return jsonResponse({ error: "Файл не выбран." }, 400);
+
+  const pageId = sanitizeSlug(request.headers.get("X-Bibika-Page"), "app");
+  const title = decodeHeaderValue(request.headers.get("X-Bibika-Title")) || pageId;
+  const platform = sanitizeSlug(request.headers.get("X-Bibika-Platform"), "file");
+  const version = decodeHeaderValue(request.headers.get("X-Bibika-Version")).trim();
+  const requestedName = decodeHeaderValue(request.headers.get("X-Bibika-File-Name"));
+  if (!version) return jsonResponse({ error: "Не указана версия файла." }, 400);
+  if (!requestedName) return jsonResponse({ error: "Не указано имя файла." }, 400);
+
+  const declaredLength = Number(request.headers.get("Content-Length") || 0);
+  if (declaredLength > MAX_RELEASE_FILE_BYTES) {
+    return jsonResponse({ error: "Файл слишком большой для загрузки через Bibika. Максимум 90 МБ." }, 413);
+  }
+
+  const cleanVersion = sanitizeReleaseVersion(version);
+  const tag = `${pageId}-v${cleanVersion}`;
+  const baseName = sanitizeAssetName(requestedName, `${pageId}-${platform}-${cleanVersion}.bin`);
+  const contentType = String(request.headers.get("Content-Type") || "application/octet-stream").split(";", 1)[0].trim() || "application/octet-stream";
+
+  try {
+    const release = await getOrCreateRelease(env, tag, title, version);
+    const assetName = uniqueAssetName(baseName, release.assets);
+    const uploadUrl = `https://uploads.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/${release.id}/assets?name=${encodeURIComponent(assetName)}`;
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        ...githubHeaders(env),
+        "Content-Type": contentType,
+      },
+      body: request.body,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(payload.message || `GitHub upload HTTP ${response.status}`);
+      error.status = response.status;
+      throw error;
+    }
+    return jsonResponse({
+      ok: true,
+      repository: `${GITHUB_OWNER}/${GITHUB_REPO}`,
+      releaseId: release.id,
+      releaseTag: tag,
+      releaseUrl: release.html_url,
+      assetId: payload.id,
+      fileName: payload.name || assetName,
+      fileSize: Number(payload.size || declaredLength || 0),
+      contentType: payload.content_type || contentType,
+      url: payload.browser_download_url,
+    });
+  } catch (error) {
+    return jsonResponse({ error: `Не удалось загрузить файл в GitHub Releases: ${error.message}` }, 502);
+  }
+}
+
+async function handleReleaseAssetDeleteApi(request, env) {
+  if (!env.GITHUB_TOKEN) return jsonResponse({ error: "GitHub Releases publishing is not configured." }, 503);
+  if (request.method !== "POST") return jsonResponse({ error: "Method not allowed." }, 405);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Некорректный JSON." }, 400);
+  }
+
+  const ids = [...new Set((Array.isArray(body?.assetIds) ? body.assetIds : []).map(Number).filter(id => Number.isInteger(id) && id > 0))];
+  if (!ids.length) return jsonResponse({ ok: true, deleted: [], failed: [] });
+  if (ids.length > 30) return jsonResponse({ error: "Слишком много файлов для удаления за один запрос." }, 400);
+
+  const deleted = [];
+  const failed = [];
+  for (const id of ids) {
+    try {
+      const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/assets/${id}`, {
+        method: "DELETE",
+        headers: githubHeaders(env),
+      });
+      if (response.status === 204 || response.status === 404) {
+        deleted.push(id);
+        continue;
+      }
+      const payload = await response.json().catch(() => ({}));
+      failed.push({ id, error: payload.message || `GitHub HTTP ${response.status}` });
+    } catch (error) {
+      failed.push({ id, error: error.message });
+    }
+  }
+  return jsonResponse({ ok: failed.length === 0, deleted, failed }, failed.length ? 207 : 200);
+}
+
 async function handleRequest(request, env) {
   const expectedUser = env.BIBIKA_USER;
   const expectedPassword = env.BIBIKA_PASSWORD;
@@ -396,6 +573,8 @@ async function handleRequest(request, env) {
   if (url.pathname === "/api/catalog") return handleCatalogApi(request, env);
   if (url.pathname === "/api/image") return handleImageApi(request, env);
   if (url.pathname === "/api/image/cleanup") return handleImageCleanupApi(request, env);
+  if (url.pathname === "/api/release/upload") return handleReleaseUploadApi(request, env);
+  if (url.pathname === "/api/release/asset/delete") return handleReleaseAssetDeleteApi(request, env);
 
   const response = await env.ASSETS.fetch(request);
   const headers = new Headers(response.headers);
@@ -407,7 +586,7 @@ async function handleRequest(request, env) {
   const contentType = response.headers.get("Content-Type") || "";
   if (contentType.includes("text/html")) {
     const html = await response.text();
-    const additions = `<script defer src="/image-editor.js?v=1"></script><script defer src="/image-cleanup.js?v=1"></script><script defer src="/text-page-blocks.js?v=1"></script><script>window.addEventListener("DOMContentLoaded",function(){try{publishData=function(nextState,message){return requestJson("/api/catalog",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({data:nextState,message:message})});};}catch(e){console.error("Bibika publish hotfix",e);}});</script>`;
+    const additions = `<script defer src="/image-editor.js?v=1"></script><script defer src="/image-cleanup.js?v=1"></script><script defer src="/text-page-files.js?v=1"></script><script defer src="/text-page-blocks.js?v=1"></script><script>window.addEventListener("DOMContentLoaded",function(){try{publishData=function(nextState,message){return requestJson("/api/catalog",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({data:nextState,message:message})});};}catch(e){console.error("Bibika publish hotfix",e);}});</script>`;
     const patched = html.includes("</body>") ? html.replace("</body>", `${additions}</body>`) : `${html}${additions}`;
     return new Response(patched, { status: response.status, statusText: response.statusText, headers });
   }
