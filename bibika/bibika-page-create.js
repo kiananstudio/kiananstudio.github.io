@@ -45,13 +45,15 @@
     button.title = 'Создать новую страницу сайта';
     const refresh = q('#bibika-refresh', actions);
     actions.insertBefore(button, refresh || actions.firstChild);
+    button.addEventListener('click', openTopCreate);
   }
 
   function tidyHeaderEditorCopy() {
     const dialog = q('#header-editor-overlay .header-editor-dialog');
     if (!dialog) return;
     const intro = q('.header-editor-head p', dialog);
-    if (intro) intro.textContent = 'Настраивай кнопки Header и выбирай существующие страницы сайта.';
+    const text = 'Настраивай кнопки Header и выбирай существующие страницы сайта.';
+    if (intro && intro.textContent !== text) intro.textContent = text;
   }
 
   function rowHref(row) {
@@ -126,8 +128,6 @@
     ensureTopButton();
     tidyHeaderEditorCopy();
 
-    q('#bibika-create-page')?.addEventListener('click', openTopCreate);
-
     document.addEventListener('click', event => {
       if (!topCreateActive) return;
 
@@ -148,11 +148,17 @@
       setTimeout(finishTopCreation, 0);
     }, true);
 
-    const observer = new MutationObserver(() => {
+    // Header editor is created by header-editor.js before this deferred script runs.
+    // A persistent MutationObserver here caused a self-triggering DOM mutation loop.
+    // Keep only a couple of harmless one-shot checks in case another page initializes later.
+    setTimeout(() => {
       ensureTopButton();
       tidyHeaderEditorCopy();
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+    }, 0);
+    setTimeout(() => {
+      ensureTopButton();
+      tidyHeaderEditorCopy();
+    }, 150);
   }
 
   if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', bind, { once: true });
