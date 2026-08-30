@@ -82,6 +82,25 @@
         "primaryUrl": ""
       },
       "icon": ""
+    },
+    {
+      "id": "bronchoscopy",
+      "category": "games",
+      "title": "Bronchoscopy",
+      "icon": "",
+      "status": "",
+      "version": "",
+      "shortDescription": "",
+      "description": "",
+      "href": "page.html?page=bronchoscopy",
+      "cover": "",
+      "gallery": [],
+      "features": [],
+      "specs": [],
+      "links": {
+        "primaryLabel": "",
+        "primaryUrl": ""
+      }
     }
   ],
   "siteHeader": {
