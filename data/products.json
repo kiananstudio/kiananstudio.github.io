@@ -121,5 +121,43 @@
       "content": "",
       "cards": []
     }
-  ]
+  ],
+  "siteStaticPages": {
+    "about": {
+      "eyebrow": "About",
+      "heading": "Kianan Studio",
+      "content": "Kianan Studio creates practical digital products for game development — Unity tools, reusable 3D assets and original games. We focus on clear workflows, useful functionality and products that are easy to integrate into real projects.",
+      "buttonPosition": "side",
+      "buttons": [
+        {
+          "label": "Unity Tools",
+          "href": "category.html?category=unity-tools",
+          "style": "primary"
+        },
+        {
+          "label": "Contact",
+          "href": "contact.html",
+          "style": "secondary"
+        }
+      ]
+    },
+    "contact": {
+      "eyebrow": "Contact",
+      "heading": "Support & business inquiries",
+      "content": "For product support, feedback, collaboration or other inquiries, contact Kianan Studio.\n\nsupport@kiananstudio.com",
+      "buttonPosition": "side",
+      "buttons": [
+        {
+          "label": "Email Kianan Studio",
+          "href": "mailto:support@kiananstudio.com",
+          "style": "primary"
+        },
+        {
+          "label": "Unity Asset Store",
+          "href": "https://assetstore.unity.com/packages/slug/398482",
+          "style": "secondary"
+        }
+      ]
+    }
+  }
 }
