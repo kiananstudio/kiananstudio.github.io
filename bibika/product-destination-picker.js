@@ -137,7 +137,7 @@
   }
 
   function enhanceRow(row) {
-    if (!row || row.dataset.destinationPickerReady === '1') return;
+    if (!catalog || !row || row.dataset.destinationPickerReady === '1') return;
     const field = q('.category-page-product-href-field', row);
     const source = q('.category-page-product-href', row);
     if (!field || !source) return;
