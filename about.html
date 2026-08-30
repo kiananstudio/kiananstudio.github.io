@@ -9,22 +9,21 @@
   <link rel="icon" type="image/png" href="assets/icons/favicon.png" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="layout-v2.css" />
+  <link rel="stylesheet" href="static-page.css?v=1" />
   <script defer src="site-header.js"></script>
-  <script defer src="script.js"></script>
+  <script defer src="static-page.js?v=1"></script>
 </head>
-<body>
+<body data-static-page="about">
   <header class="site-header"><div class="nav-shell">
     <a class="brand" href="./" aria-label="Kianan Studio home"><img class="brand-logo" src="assets/images/kianan-studio-logo.webp" alt="Kianan Studio" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'" /><span class="brand-mark brand-fallback" style="display:none">K</span><span class="brand-name"><strong>Kianan</strong><small>Studio</small></span></a>
     <nav class="nav-links product-nav"><a href="category.html?category=unity-tools">Unity Tools</a><a href="category.html?category=games">Games</a><a href="category.html?category=3d-assets">3D Assets</a><a href="about.html">About</a><a href="contact.html">Contact</a></nav>
   </div></header>
   <main class="product-page"><div class="product-page-shell">
     <a class="back-link" href="./">← Home</a>
-    <section class="section-heading standalone-heading"><span class="eyebrow">About</span><h1 class="catalog-page-title">Kianan Studio</h1><p>Kianan Studio creates Unity tools, reusable 3D assets and original games with a focus on practical workflows, clear design and useful results.</p></section>
-    <div class="pillars">
-      <article class="pillar"><span class="pillar-icon">◇</span><h3>Unity Tools</h3><p>Editor extensions and focused utilities for real production workflows.</p></article>
-      <article class="pillar"><span class="pillar-icon">⬡</span><h3>3D Assets</h3><p>Reusable models and content prepared for game development.</p></article>
-      <article class="pillar"><span class="pillar-icon">△</span><h3>Games</h3><p>Original interactive projects developed under the Kianan Studio brand.</p></article>
-    </div>
+    <section class="contact-panel standalone-contact static-page-panel buttons-side" id="static-page-panel">
+      <div class="static-page-copy"><span class="eyebrow" id="static-page-eyebrow">About</span><h1 class="catalog-page-title" id="static-page-heading">Kianan Studio</h1><div class="static-page-text" id="static-page-text"></div></div>
+      <div class="contact-actions" id="static-page-actions"></div>
+    </section>
   </div></main>
   <footer class="site-footer"><div class="footer-inner"><div class="footer-brand"><strong>Kianan Studio</strong><span>Unity tools, 3D assets and games.</span></div><p>© <span id="year"></span> Kianan Studio. All rights reserved.</p></div></footer>
 </body>
