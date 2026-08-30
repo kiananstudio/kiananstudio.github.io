@@ -9,20 +9,20 @@
   <link rel="icon" type="image/png" href="assets/icons/favicon.png" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="layout-v2.css" />
-  <script defer src="site-config.js"></script>
+  <link rel="stylesheet" href="static-page.css?v=1" />
   <script defer src="site-header.js"></script>
-  <script defer src="script.js"></script>
+  <script defer src="static-page.js?v=1"></script>
 </head>
-<body>
+<body data-static-page="contact">
   <header class="site-header"><div class="nav-shell">
     <a class="brand" href="./" aria-label="Kianan Studio home"><img class="brand-logo" src="assets/images/kianan-studio-logo.webp" alt="Kianan Studio" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'" /><span class="brand-mark brand-fallback" style="display:none">K</span><span class="brand-name"><strong>Kianan</strong><small>Studio</small></span></a>
     <nav class="nav-links product-nav"><a href="category.html?category=unity-tools">Unity Tools</a><a href="category.html?category=games">Games</a><a href="category.html?category=3d-assets">3D Assets</a><a href="about.html">About</a><a href="contact.html">Contact</a></nav>
   </div></header>
   <main class="product-page"><div class="product-page-shell">
     <a class="back-link" href="./">← Home</a>
-    <section class="contact-panel standalone-contact">
-      <div><span class="eyebrow">Contact</span><h1 class="catalog-page-title">Support & business inquiries</h1><p>For product support, feedback, collaboration or other inquiries, contact Kianan Studio.</p><p class="contact-hint" id="contact-hint">The branded support mailbox will be added here after it is created.</p></div>
-      <div class="contact-actions"><a class="button button-primary" id="email-link" href="#">Email Kianan Studio</a><a class="button button-secondary store-link" data-store-link href="https://assetstore.unity.com/packages/slug/398482" target="_blank" rel="noopener">Unity Asset Store</a></div>
+    <section class="contact-panel standalone-contact static-page-panel buttons-side" id="static-page-panel">
+      <div class="static-page-copy"><span class="eyebrow" id="static-page-eyebrow">Contact</span><h1 class="catalog-page-title" id="static-page-heading">Support & business inquiries</h1><div class="static-page-text" id="static-page-text"></div></div>
+      <div class="contact-actions" id="static-page-actions"></div>
     </section>
   </div></main>
   <footer class="site-footer"><div class="footer-inner"><div class="footer-brand"><strong>Kianan Studio</strong><span>Unity tools, 3D assets and games.</span></div><p>© <span id="year"></span> Kianan Studio. All rights reserved.</p></div></footer>
