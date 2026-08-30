@@ -6,7 +6,7 @@ const IMAGE_DIR = "assets/images";
 const GITHUB_API = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${CATALOG_PATH}`;
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_CLEANUP_PATHS = 30;
-const BIBIKA_IMAGE_RE = /^assets\/images\/[a-z0-9-]+-(cover|gallery|icon)-\d{14}-[a-f0-9]{8}\.webp$/;
+const BIBIKA_IMAGE_RE = /^assets\/images\/[a-z0-9-]+-(cover|gallery|icon|page)-\d{14}-[a-f0-9]{8}\.webp$/;
 
 function unauthorized() {
   return new Response("Authentication required", {
@@ -92,6 +92,15 @@ function collectCatalogImages(data) {
       if (path) result.add(path);
     }
   }
+
+  for (const page of data?.sitePages || []) {
+    for (const block of Array.isArray(page?.blocks) ? page.blocks : []) {
+      if (block?.type !== "image") continue;
+      const path = normalizeImagePath(block?.image);
+      if (path) result.add(path);
+    }
+  }
+
   return result;
 }
 
@@ -315,7 +324,7 @@ async function handleImageApi(request, env) {
 
   const productId = sanitizeSlug(request.headers.get("X-Bibika-Product"));
   const target = String(request.headers.get("X-Bibika-Target") || "").toLowerCase();
-  if (!new Set(["cover", "gallery", "icon"]).has(target)) {
+  if (!new Set(["cover", "gallery", "icon", "page"]).has(target)) {
     return jsonResponse({ error: "Некорректное назначение изображения." }, 400);
   }
 
@@ -398,7 +407,7 @@ async function handleRequest(request, env) {
   const contentType = response.headers.get("Content-Type") || "";
   if (contentType.includes("text/html")) {
     const html = await response.text();
-    const additions = `<script defer src="/image-editor.js?v=1"></script><script defer src="/image-cleanup.js?v=1"></script><script>window.addEventListener("DOMContentLoaded",function(){try{publishData=function(nextState,message){return requestJson("/api/catalog",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({data:nextState,message:message})});};}catch(e){console.error("Bibika publish hotfix",e);}});</script>`;
+    const additions = `<script defer src="/image-editor.js?v=1"></script><script defer src="/image-cleanup.js?v=1"></script><script defer src="/text-page-blocks.js?v=1"></script><script>window.addEventListener("DOMContentLoaded",function(){try{publishData=function(nextState,message){return requestJson("/api/catalog",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({data:nextState,message:message})});};}catch(e){console.error("Bibika publish hotfix",e);}});</script>`;
     const patched = html.includes("</body>") ? html.replace("</body>", `${additions}</body>`) : `${html}${additions}`;
     return new Response(patched, { status: response.status, statusText: response.statusText, headers });
   }
