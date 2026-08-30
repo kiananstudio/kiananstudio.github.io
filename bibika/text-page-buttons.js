@@ -161,9 +161,11 @@
       link.className = 'text-page-site-link';
       link.href = item.href;
       const main = document.createElement('span');
-      main.innerHTML = `<strong></strong><span></span>`;
-      q('strong', main).textContent = item.title;
-      q('span span', main).textContent = item.href;
+      const strong = document.createElement('strong');
+      const path = document.createElement('span');
+      strong.textContent = item.title;
+      path.textContent = item.href;
+      main.append(strong, path);
       const badge = document.createElement('em');
       badge.textContent = item.badge;
       link.append(main, badge);
