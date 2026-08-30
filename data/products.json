@@ -128,13 +128,7 @@
       "heading": "Kianan Studio",
       "content": "Kianan Studio creates practical digital products for game development — Unity tools, reusable 3D assets and original games. We focus on clear workflows, useful functionality and products that are easy to integrate into real projects.",
       "buttonPosition": "bottom",
-      "buttons": [
-        {
-          "label": "Contact",
-          "href": "contact.html",
-          "style": "secondary"
-        }
-      ]
+      "buttons": []
     },
     "contact": {
       "eyebrow": "Contact",
