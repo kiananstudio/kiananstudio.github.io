@@ -130,14 +130,9 @@
       "buttonPosition": "bottom",
       "buttons": [
         {
-          "label": "Unity Tools",
-          "href": "category.html?category=unity-tools",
-          "style": "primary"
-        },
-        {
           "label": "Contact",
           "href": "contact.html",
-          "style": "primary"
+          "style": "secondary"
         }
       ]
     },
