@@ -16,6 +16,14 @@
     };
   }
 
+  function normalizeButton(button) {
+    return {
+      label: String(button?.label || '').trim(),
+      href: String(button?.href || '').trim(),
+      style: button?.style === 'secondary' ? 'secondary' : 'primary'
+    };
+  }
+
   function normalizePages(value) {
     if (!Array.isArray(value)) return [];
     return value.map(item => {
@@ -26,7 +34,9 @@
         type: item?.type === 'categories' ? 'categories' : 'text',
         heading: String(item?.heading || title).trim() || title,
         content: String(item?.content ?? item?.description ?? '').trim(),
-        cards: Array.isArray(item?.cards) ? item.cards.map(normalizeCard).filter(card => card.title) : []
+        cards: Array.isArray(item?.cards) ? item.cards.map(normalizeCard).filter(card => card.title) : [],
+        buttonPosition: item?.buttonPosition === 'bottom' ? 'bottom' : 'side',
+        buttons: Array.isArray(item?.buttons) ? item.buttons.map(normalizeButton).filter(button => button.label && button.href) : []
       };
     }).filter(item => item.id && item.title);
   }
@@ -48,13 +58,54 @@
     if (edit) edit.hidden = true;
   }
 
+  function appendParagraphs(host, value) {
+    String(value || '').split(/\n{2,}/).map(item => item.trim()).filter(Boolean).forEach(chunk => {
+      const p = document.createElement('p');
+      p.textContent = chunk;
+      host.appendChild(p);
+    });
+  }
+
   function renderText(page, host) {
+    const headingBlock = q('#managed-page .section-heading');
+    if (headingBlock) headingBlock.hidden = true;
     host.className = 'managed-page-content managed-page-text';
+
+    const panel = document.createElement('section');
+    panel.className = `contact-panel standalone-contact managed-text-panel ${page.buttonPosition === 'bottom' ? 'buttons-bottom' : 'buttons-side'}`;
+    const copy = document.createElement('div');
+    copy.className = 'managed-text-copy';
+    const eyebrow = document.createElement('span');
+    eyebrow.className = 'eyebrow';
+    eyebrow.textContent = page.title;
+    const heading = document.createElement('h1');
+    heading.className = 'catalog-page-title';
+    heading.textContent = page.heading || page.title;
     const text = document.createElement('div');
     text.className = 'managed-page-text-body';
-    text.textContent = page.content;
-    host.replaceChildren(text);
-    host.hidden = !page.content;
+    appendParagraphs(text, page.content);
+    copy.append(eyebrow, heading, text);
+
+    const actions = document.createElement('div');
+    actions.className = 'contact-actions managed-text-actions';
+    page.buttons.forEach(button => {
+      const href = safeHref(button.href);
+      if (!href) return;
+      const link = document.createElement('a');
+      link.className = `button ${button.style === 'secondary' ? 'button-secondary' : 'button-primary'}`;
+      link.textContent = button.label;
+      link.href = href;
+      if (/^https?:\/\//i.test(href)) {
+        link.dataset.bibikaPublic = 'true';
+        link.target = '_blank';
+        link.rel = 'noopener';
+      }
+      actions.appendChild(link);
+    });
+
+    panel.append(copy, actions);
+    host.replaceChildren(panel);
+    host.hidden = false;
   }
 
   function renderCard(card) {
@@ -82,6 +133,10 @@
   }
 
   function renderCategories(page, host) {
+    const headingBlock = q('#managed-page .section-heading');
+    if (headingBlock) headingBlock.hidden = false;
+    q('#managed-page-title').textContent = page.heading || page.title;
+    q('#managed-page-description').hidden = true;
     host.className = 'managed-page-content managed-page-categories';
     const grid = document.createElement('div');
     grid.className = 'category-grid home-category-grid';
@@ -92,8 +147,6 @@
 
   function renderPage(page) {
     document.title = `${page.title} — Kianan Bibika`;
-    q('#managed-page-title').textContent = page.heading || page.title;
-    q('#managed-page-description').hidden = true;
     const host = q('#managed-page-content');
     if (page.type === 'categories') renderCategories(page, host);
     else renderText(page, host);
@@ -154,7 +207,6 @@
   function renderSitePagesSection(data) {
     const body = q('#header-page-create-overlay .header-page-create-body');
     if (!body) return;
-
     let section = q('#managed-editor-site-pages');
     if (!section) {
       section = document.createElement('section');
@@ -163,15 +215,12 @@
       section.innerHTML = '<div class="managed-editor-site-pages-head"><strong>Страницы сайта</strong><span>Переходи между страницами внутри Bibika.</span></div><div class="managed-editor-site-pages-list"></div>';
       body.appendChild(section);
     }
-
     const editingExistingPage = !!q('#header-page-id')?.disabled;
     section.hidden = !editingExistingPage;
     if (!editingExistingPage) return;
-
     const list = section.querySelector('.managed-editor-site-pages-list');
     list.replaceChildren();
     const currentId = pageId();
-
     sitePageItems(data).forEach(item => {
       const link = document.createElement('a');
       link.className = 'managed-editor-site-page';
@@ -181,7 +230,6 @@
         link.classList.add('current');
         link.setAttribute('aria-current', 'page');
       }
-
       const main = document.createElement('span');
       main.className = 'managed-editor-site-page-main';
       const strong = document.createElement('strong');
@@ -189,7 +237,6 @@
       const path = document.createElement('span');
       path.textContent = item.href;
       main.append(strong, path);
-
       const badge = document.createElement('span');
       badge.className = 'managed-editor-site-page-badge';
       badge.textContent = isCurrent ? 'Текущая' : item.badge;
@@ -203,9 +250,7 @@
     try {
       const response = await fetch(`${API_URL}?t=${Date.now()}`, { cache: 'no-store', credentials: 'same-origin' });
       if (response.ok) latestCatalog = await response.json();
-    } catch {
-      // Keep the latest successfully loaded catalog.
-    }
+    } catch {}
     if (latestCatalog) renderSitePagesSection(latestCatalog);
   }
 
@@ -213,9 +258,7 @@
     const overlay = q('#header-page-create-overlay');
     if (!overlay) return;
     const observer = new MutationObserver(() => {
-      if (overlay.classList.contains('open')) {
-        setTimeout(refreshSitePagesSection, 0);
-      }
+      if (overlay.classList.contains('open')) setTimeout(refreshSitePagesSection, 0);
     });
     observer.observe(overlay, { attributes: true, attributeFilter: ['class'] });
   }
@@ -225,7 +268,6 @@
     event.stopPropagation();
     openCurrentPageEditor();
   });
-
   window.addEventListener('DOMContentLoaded', bindPageEditorEnhancements, { once: true });
 
   fetch(`${API_URL}?t=${Date.now()}`, { cache: 'no-store', credentials: 'same-origin' })
