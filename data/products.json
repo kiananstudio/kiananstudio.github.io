@@ -133,9 +133,20 @@
       "title": "Bronchoscopy",
       "type": "text",
       "heading": "Bronchoscopy",
-      "content": "Bronchoscopy text",
+      "content": "Bronchoscopy is an interactive simulator designed for practicing bronchoscope navigation and basic endoscopic skills in a virtual environment.\nExplore the airways, learn to control the bronchoscope, and become familiar with navigation through the bronchial tree using simple and intuitive controls.\nThe simulator is designed as a practical training and demonstration tool. Future versions may expand the experience with additional procedures, training scenarios, and new interactive features.\nBronchoscopy is intended for educational and simulation purposes only and is not a medical device.",
       "cards": [],
-      "blocks": [],
+      "blocks": [
+        {
+          "type": "image",
+          "image": "assets/images/bronchoscopy-page-20260830220857-125d0900.webp",
+          "alt": ""
+        },
+        {
+          "type": "image",
+          "image": "assets/images/bronchoscopy-page-20260830220915-65a354bf.webp",
+          "alt": ""
+        }
+      ],
       "files": [],
       "buttonPosition": "side",
       "buttons": []
