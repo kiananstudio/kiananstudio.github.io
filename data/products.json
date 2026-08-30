@@ -145,9 +145,35 @@
           "type": "image",
           "image": "assets/images/bronchoscopy-page-20260830220915-65a354bf.webp",
           "alt": ""
+        },
+        {
+          "type": "text",
+          "heading": "Installation on Android",
+          "content": "To install the APK, Android may ask you to allow installation from unknown sources.\nDownload the APK file.\nOpen the downloaded file.\nIf Android blocks the installation, open Settings when prompted.\nEnable Allow from this source for the browser or file manager you used to open the APK.\nReturn to the installer and continue the installation.\nAfter installation, you can disable this permission again if you prefer.\nThe wording and location of this setting may vary depending on the Android version and device manufacturer.",
+          "buttonPosition": "side",
+          "buttons": []
         }
       ],
-      "files": [],
+      "files": [
+        {
+          "platform": "android",
+          "version": "1.0.0",
+          "minimum": "Android 8.0",
+          "architecture": "Universal",
+          "requirements": "",
+          "label": "Download APK",
+          "fileName": "Bronchoscopy.apk",
+          "fileSize": 41131898,
+          "contentType": "application/vnd.android.package-archive",
+          "url": "https://github.com/kiananstudio/kiananstudio.github.io/releases/download/bronchoscopy-v1.0.0/Bronchoscopy.apk",
+          "releaseTag": "bronchoscopy-v1.0.0",
+          "releaseId": 379424033,
+          "assetId": 537152803,
+          "uploadedAt": "2026-08-30T22:49:51.370Z",
+          "uploadedPlatform": "android",
+          "uploadedVersion": "1.0.0"
+        }
+      ],
       "buttonPosition": "side",
       "buttons": []
     }
