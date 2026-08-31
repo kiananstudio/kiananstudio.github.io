@@ -103,6 +103,7 @@
         </div>
 
         <footer class="modal-actions product-editor-actions">
+          <button type="button" class="btn btn-danger" id="delete-product">Удалить продукт</button>
           <button type="button" class="btn btn-ghost" id="cancel-editor">Отмена</button>
           <button type="button" class="btn btn-primary" id="save-editor">Сохранить изменения</button>
         </footer>
@@ -357,8 +358,13 @@
       currentProduct = updated;
       state.textContent = 'Изменения сохранены.';
       showToast('Продукт сохранён в GitHub.');
+      saving = false;
       closeModal();
-      setTimeout(() => location.reload(), 220);
+      setTimeout(() => {
+        const url = new URL(location.href);
+        url.searchParams.set('t', String(Date.now()));
+        location.replace(url.href);
+      }, 700);
     } catch (error) {
       state.textContent = `Ошибка: ${error.message}`;
       showToast(`Не удалось сохранить продукт: ${error.message}`, 6200);
@@ -371,6 +377,51 @@
     }
   }
 
+  async function deleteProduct() {
+    if (saving || !currentProduct) return;
+    const name = String(currentProduct.title || currentProduct.id || 'этот продукт');
+    if (!confirm(`Удалить продукт «${name}»? Продукт исчезнет с сайта. Это действие нельзя отменить.`)) return;
+
+    const save = q('#save-editor');
+    const cancel = q('#cancel-editor');
+    const close = q('#close-editor');
+    const remove = q('#delete-product');
+    const state = q('#product-editor-state');
+    saving = true;
+    [save, cancel, close, remove].forEach(button => { if (button) button.disabled = true; });
+    if (remove) remove.textContent = 'Удаление…';
+    if (state) state.textContent = 'Удаляю продукт из каталога…';
+
+    try {
+      const latest = await fetchCatalog();
+      const index = (Array.isArray(latest.products) ? latest.products : []).findIndex(item => String(item?.id || '') === productId);
+      if (index < 0) throw new Error('Продукт уже отсутствует в каталоге.');
+      const category = String(latest.products[index]?.category || currentProduct.category || 'unity-tools');
+      latest.products.splice(index, 1);
+
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: latest, message: `Bibika: delete product ${productId}` })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+
+      showToast('Продукт удалён из каталога.');
+      location.href = `category.html?category=${encodeURIComponent(category)}&t=${Date.now()}`;
+      return;
+    } catch (error) {
+      if (state) state.textContent = `Ошибка: ${error.message}`;
+      showToast(`Не удалось удалить продукт: ${error.message}`, 6200);
+    } finally {
+      saving = false;
+      [save, cancel, close, remove].forEach(button => { if (button) button.disabled = false; });
+      if (remove) remove.textContent = 'Удалить продукт';
+    }
+  }
+
   function removeRow(target) {
     target.closest('.repeat-item, .product-editor-spec-row')?.remove();
   }
@@ -378,6 +429,7 @@
   function bind() {
     q('#edit-product')?.addEventListener('click', openEditor);
     q('#save-editor')?.addEventListener('click', saveEditor);
+    q('#delete-product')?.addEventListener('click', deleteProduct);
     q('#cancel-editor')?.addEventListener('click', closeModal);
     q('#close-editor')?.addEventListener('click', closeModal);
     q('#editor-modal')?.addEventListener('click', event => {

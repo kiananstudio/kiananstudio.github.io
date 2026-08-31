@@ -379,14 +379,14 @@
 
   function addProduct() {
     syncWorkingFromRows();
-    workingProducts.push(normalizeProduct({
+    workingProducts.unshift(normalizeProduct({
       id: '', category: categoryId, title: '', icon: '', shortDescription: '', href: '', status: '', version: '',
       description: '', cover: '', gallery: [], features: [], specs: [], links: { primaryLabel: '', primaryUrl: '' }
     }, true));
     renderProductRows();
-    const last = q('.category-page-product-row-fields:last-child');
-    last?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    q('.category-page-product-title', last)?.focus();
+    const first = q('.category-page-product-row-fields:first-child');
+    first?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    q('.category-page-product-title', first)?.focus();
   }
 
   function moveProduct(key, direction) {
