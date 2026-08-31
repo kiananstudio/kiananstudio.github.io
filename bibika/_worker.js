@@ -31,6 +31,23 @@ function jsonResponse(value, status = 200) {
   });
 }
 
+function validateCsrfRequest(request, url) {
+  const method = String(request.method || "GET").toUpperCase();
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") return null;
+
+  const origin = String(request.headers.get("Origin") || "").trim();
+  if (!origin || origin !== url.origin) {
+    return jsonResponse({ error: "Запрос заблокирован защитой Bibika (CSRF)." }, 403);
+  }
+
+  const fetchSite = String(request.headers.get("Sec-Fetch-Site") || "").trim().toLowerCase();
+  if (fetchSite && fetchSite !== "same-origin") {
+    return jsonResponse({ error: "Запрос заблокирован защитой Bibika (CSRF)." }, 403);
+  }
+
+  return null;
+}
+
 function githubHeaders(env) {
   return {
     Accept: "application/vnd.github+json",
@@ -570,6 +587,11 @@ async function handleRequest(request, env) {
   if (credentials.slice(0, separator) !== expectedUser || credentials.slice(separator + 1) !== expectedPassword) return unauthorized();
 
   const url = new URL(request.url);
+  if (url.pathname.startsWith("/api/")) {
+    const csrfError = validateCsrfRequest(request, url);
+    if (csrfError) return csrfError;
+  }
+
   if (url.pathname === "/api/catalog") return handleCatalogApi(request, env);
   if (url.pathname === "/api/image") return handleImageApi(request, env);
   if (url.pathname === "/api/image/cleanup") return handleImageCleanupApi(request, env);
