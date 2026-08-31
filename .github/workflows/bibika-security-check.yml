@@ -1,0 +1,29 @@
+name: Bibika security check
+
+on:
+  push:
+    branches: [bibika-admin-v1]
+    paths:
+      - .github/workflows/bibika-security-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bibika-admin-v1
+      - name: Check JavaScript syntax
+        run: |
+          node --check bibika/_worker.js
+          node --check bibika/text-page-files.js
+          node --check bibika/publish-hotfix.js
+      - name: Verify security hooks
+        run: |
+          grep -q 'Content-Security-Policy' bibika/_worker.js
+          grep -q 'validateReleaseUpload' bibika/_worker.js
+          grep -q 'X-Bibika-File-Size' bibika/text-page-files.js
+          grep -q '/publish-hotfix.js' bibika/_worker.js
