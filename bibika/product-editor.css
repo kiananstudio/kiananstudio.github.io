@@ -1,0 +1,52 @@
+.product-page{position:relative}
+.product-edit-trigger{position:absolute;top:18px;right:18px;z-index:8;width:44px;height:44px;border-radius:14px;border:1px solid rgba(72,171,230,.45);background:rgba(7,19,28,.94);color:#dff4ff;display:grid;place-items:center;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.28)}
+.product-edit-trigger:hover{border-color:rgba(72,171,230,.9);background:rgba(10,31,45,.98)}
+.product-edit-trigger:disabled{opacity:.5;cursor:wait}
+.product-edit-trigger .mirrored-pencil{font-size:1.05rem}
+
+.product-editor-backdrop{display:none;position:fixed;inset:0;z-index:1200;background:rgba(1,7,11,.78);backdrop-filter:blur(8px);padding:28px;overflow:auto;place-items:start center}
+.product-editor-backdrop.open{display:grid}
+.product-editor-modal{width:min(1120px,100%);max-height:none;margin:auto;background:#0b1219;border:1px solid rgba(124,174,208,.22);border-radius:20px;box-shadow:0 28px 90px rgba(0,0,0,.55);overflow:hidden}
+.product-editor-head{position:sticky;top:0;z-index:3;background:rgba(11,18,25,.97);backdrop-filter:blur(8px);border-bottom:1px solid rgba(124,174,208,.16)}
+.product-editor-body{display:grid;gap:20px;padding:24px}
+.product-editor-grid{display:grid;gap:16px}
+.product-editor-grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.product-editor-grid-3{grid-template-columns:1fr 1fr 1fr}
+.product-editor-body .field{display:grid;gap:8px}
+.product-editor-body .field>span{font-size:.82rem;color:#9fb1bf;font-weight:700}
+.product-editor-body input,.product-editor-body textarea,.product-editor-body select{width:100%;box-sizing:border-box;border:1px solid rgba(127,175,213,.2);border-radius:12px;background:#081018;color:#edf6fb;padding:11px 12px;font:inherit;outline:none}
+.product-editor-body textarea{resize:vertical;min-height:90px;line-height:1.5}
+.product-editor-body input:focus,.product-editor-body textarea:focus,.product-editor-body select:focus{border-color:rgba(43,151,225,.8);box-shadow:0 0 0 3px rgba(43,151,225,.12)}
+.product-editor-body input[readonly]{opacity:.72;cursor:not-allowed}
+.product-editor-body small{color:#718392;font-size:.78rem;line-height:1.4}
+
+.product-editor-section{display:grid;gap:14px;padding:18px;border:1px solid rgba(127,175,213,.16);border-radius:16px;background:rgba(255,255,255,.018)}
+.product-editor-section .section-line{display:flex;justify-content:space-between;align-items:center;gap:14px}
+.product-editor-section .section-line>div{display:grid;gap:3px}
+.product-editor-section .section-line strong{color:#eef7fc;font-size:1rem}
+.product-editor-section .section-line small{color:#7f919f}
+
+.product-editor-repeat-row{display:grid;grid-template-columns:minmax(0,1fr) 40px;gap:9px;align-items:center}
+.product-editor-repeat-row+.product-editor-repeat-row{margin-top:9px}
+.product-editor-spec-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 40px;gap:9px;align-items:center}
+.product-editor-spec-row+.product-editor-spec-row{margin-top:9px}
+.product-editor-repeat-row .remove-row,.product-editor-spec-row .remove-spec{width:40px;height:40px;border-radius:10px;border:1px solid rgba(235,102,102,.28);background:rgba(132,37,37,.14);color:#ffb4b4;cursor:pointer;font-size:1.2rem}
+.product-editor-repeat-row .remove-row:hover,.product-editor-spec-row .remove-spec:hover{background:rgba(132,37,37,.28)}
+
+.product-editor-state{min-height:22px;margin:0;color:#9fb3c2;font-size:.88rem}
+.product-editor-actions{position:sticky;bottom:0;z-index:3;background:rgba(11,18,25,.97);backdrop-filter:blur(8px);border-top:1px solid rgba(124,174,208,.16);display:flex;justify-content:flex-end;gap:10px;padding:16px 24px}
+
+@media(max-width:760px){
+  .product-editor-backdrop{padding:10px}
+  .product-editor-grid-2,.product-editor-grid-3{grid-template-columns:1fr}
+  .product-editor-section .section-line{align-items:flex-start;flex-direction:column}
+  .product-editor-spec-row{grid-template-columns:1fr 1fr 40px}
+  .product-edit-trigger{top:10px;right:10px}
+}
+
+@media(max-width:520px){
+  .product-editor-body{padding:16px}
+  .product-editor-spec-row{grid-template-columns:1fr 40px}
+  .product-editor-spec-row .spec-value{grid-column:1/2}
+  .product-editor-spec-row .remove-spec{grid-column:2/3;grid-row:1/3}
+}
