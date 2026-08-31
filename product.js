@@ -94,7 +94,11 @@
         <figure class="media-frame product-gallery-item"><img src="${escapeHtml(src)}" alt="${escapeHtml(product.title)} screenshot" loading="lazy"></figure>
       `).join('');
 
+      const about = String(product.description || '').trim();
       const features = (product.features || []).map(item => `<li>${escapeHtml(item)}</li>`).join('');
+      const specs = (Array.isArray(product.specs) ? product.specs : [])
+        .filter(pair => Array.isArray(pair) && String(pair[0] || '').trim() && String(pair[1] || '').trim())
+        .map(pair => `<li><strong>${escapeHtml(pair[0])}:</strong> ${escapeHtml(pair[1])}</li>`).join('');
       const distribution = product.distribution || { type: 'external', repository: '', downloads: [] };
       const distributionType = distribution.type || 'external';
       const releasesUrl = releaseRepositoryUrl(distribution.repository);
@@ -144,7 +148,7 @@
               ${product.status ? `<span>${escapeHtml(product.status)}</span>` : ''}
               ${product.version ? `<span>Version ${escapeHtml(product.version)}</span>` : ''}
             </div>
-            <p class="product-lead">${escapeHtml(product.description || product.shortDescription || '')}</p>
+            <p class="product-lead">${escapeHtml(product.shortDescription || product.description || '')}</p>
             <div class="hero-actions">${primary}</div>
           </div>
           <div class="product-cover-panel">
