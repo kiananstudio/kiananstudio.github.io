@@ -40,6 +40,18 @@
     return `Download for ${platformNames[platform] || 'your platform'}`;
   }
 
+  function safePrimaryUrl(value) {
+    const href = String(value || '').trim();
+    if (!href) return '';
+    try {
+      const url = new URL(href, 'https://kiananstudio.com/');
+      if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
+      return url.href;
+    } catch {
+      return '';
+    }
+  }
+
   function releaseRepositoryUrl(repository) {
     const value = String(repository || '').trim();
     if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value)) return '';
@@ -95,9 +107,12 @@
       let primary = '';
       if (distributionType === 'github-releases') {
         if (validDownloads.length) primary += '<a class="button button-primary" href="#downloads">Download</a>';
-        if (releasesUrl) primary += `<a class="button button-secondary" href="${escapeHtml(releasesUrl)}" target="_blank" rel="noopener">GitHub Releases</a>`;
-      } else if (distributionType !== 'none' && product.links?.primaryUrl) {
-        primary = `<a class="button button-primary" href="${escapeHtml(product.links.primaryUrl)}" target="_blank" rel="noopener">${escapeHtml(product.links.primaryLabel || 'Open link')}</a>`;
+        if (releasesUrl) primary += `<a class="button button-secondary" href="${escapeHtml(releasesUrl)}" target="_blank" rel="noopener noreferrer">GitHub Releases</a>`;
+      } else if (distributionType !== 'none') {
+        const primaryUrl = safePrimaryUrl(product.links?.primaryUrl);
+        if (primaryUrl) {
+          primary = `<a class="button button-primary" href="${escapeHtml(primaryUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(product.links?.primaryLabel || 'Open link')}</a>`;
+        }
       }
 
       const downloads = validDownloads.map(({ item, asset }) => {
