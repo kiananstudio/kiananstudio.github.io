@@ -37,6 +37,18 @@ function tooManyLoginAttempts(retryAfter = LOGIN_BLOCK_SECONDS) {
   });
 }
 
+function logoutResponse() {
+  return new Response(JSON.stringify({ ok: true }), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Clear-Site-Data": '"cookies"',
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
 function clientIp(request) {
   return String(request.headers.get("CF-Connecting-IP") || "unknown").trim() || "unknown";
 }
@@ -726,6 +738,13 @@ async function handleRequest(request, env) {
   }
 
   if (authGatePath(url)) await clearLoginFailures(request, env);
+
+  if (url.pathname === "/logout") {
+    if (request.method !== "POST") return jsonResponse({ error: "Method not allowed." }, 405);
+    const csrfError = validateCsrfRequest(request, url);
+    if (csrfError) return csrfError;
+    return logoutResponse();
+  }
 
   if (url.pathname.startsWith("/api/")) {
     const csrfError = validateCsrfRequest(request, url);
