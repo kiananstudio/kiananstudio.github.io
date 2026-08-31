@@ -7,6 +7,7 @@ const GITHUB_API = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_RELEASE_FILE_BYTES = 90 * 1024 * 1024;
 const MAX_CLEANUP_PATHS = 30;
+const LOGIN_BLOCK_SECONDS = 180;
 const BIBIKA_IMAGE_RE = /^assets\/images\/[a-z0-9-]+-(cover|gallery|icon|page)-\d{14}-[a-f0-9]{8}\.webp$/;
 
 function unauthorized() {
@@ -18,6 +19,32 @@ function unauthorized() {
       "X-Content-Type-Options": "nosniff",
     },
   });
+}
+
+function tooManyLoginAttempts() {
+  return new Response("Too many failed login attempts. Try again in 3 minutes.", {
+    status: 429,
+    headers: {
+      "Retry-After": String(LOGIN_BLOCK_SECONDS),
+      "Cache-Control": "no-store",
+      "Content-Type": "text/plain; charset=utf-8",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
+async function rejectFailedLogin(request, env) {
+  const limiter = env.BIBIKA_LOGIN_RATE_LIMITER;
+  if (!limiter || typeof limiter.limit !== "function") return unauthorized();
+
+  const ip = String(request.headers.get("CF-Connecting-IP") || "unknown").trim() || "unknown";
+  try {
+    const { success } = await limiter.limit({ key: `bibika-login:${ip}` });
+    if (!success) return tooManyLoginAttempts();
+  } catch (error) {
+    console.error("Bibika login rate limiter error", error);
+  }
+  return unauthorized();
 }
 
 function jsonResponse(value, status = 200) {
@@ -574,17 +601,20 @@ async function handleRequest(request, env) {
   }
 
   const authorization = request.headers.get("Authorization");
-  if (!authorization || !authorization.startsWith("Basic ")) return unauthorized();
+  if (!authorization) return unauthorized();
+  if (!authorization.startsWith("Basic ")) return rejectFailedLogin(request, env);
 
   let credentials;
   try {
     credentials = atob(authorization.slice(6));
   } catch {
-    return unauthorized();
+    return rejectFailedLogin(request, env);
   }
   const separator = credentials.indexOf(":");
-  if (separator < 0) return unauthorized();
-  if (credentials.slice(0, separator) !== expectedUser || credentials.slice(separator + 1) !== expectedPassword) return unauthorized();
+  if (separator < 0) return rejectFailedLogin(request, env);
+  if (credentials.slice(0, separator) !== expectedUser || credentials.slice(separator + 1) !== expectedPassword) {
+    return rejectFailedLogin(request, env);
+  }
 
   const url = new URL(request.url);
   if (url.pathname.startsWith("/api/")) {
