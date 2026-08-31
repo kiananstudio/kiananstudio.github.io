@@ -1,11 +1,11 @@
 .product-page{position:relative}
-.product-edit-trigger{position:absolute;top:18px;right:18px;z-index:8;width:44px;height:44px;border-radius:14px;border:1px solid rgba(72,171,230,.45);background:rgba(7,19,28,.94);color:#dff4ff;display:grid;place-items:center;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.28)}
-.product-edit-trigger:hover{border-color:rgba(72,171,230,.9);background:rgba(10,31,45,.98)}
+.product-edit-trigger{position:absolute;right:12px;bottom:0;transform:translateY(50%);z-index:12;width:34px;height:34px;border-radius:10px;border:1px solid rgba(66,196,255,.42);background:rgba(7,11,16,.9);color:#dff5ff;display:grid;place-items:center;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.28)}
+.product-edit-trigger:hover{border-color:rgba(66,196,255,.8);background:rgba(21,152,238,.16)}
 .product-edit-trigger:disabled{opacity:.5;cursor:wait}
 .product-edit-trigger .mirrored-pencil{font-size:1.05rem}
 
-.product-editor-backdrop{display:none;position:fixed;inset:0;z-index:1200;background:rgba(1,7,11,.78);backdrop-filter:blur(8px);padding:28px;overflow:auto;place-items:start center}
-.product-editor-backdrop.open{display:grid}
+.product-editor-backdrop{display:none!important;position:fixed;inset:0;z-index:1200;background:rgba(1,7,11,.78);backdrop-filter:blur(8px);padding:28px;overflow:auto;place-items:start center}
+.product-editor-backdrop.open{display:grid!important}
 .product-editor-modal{width:min(1120px,100%);max-height:none;margin:auto;background:#0b1219;border:1px solid rgba(124,174,208,.22);border-radius:20px;box-shadow:0 28px 90px rgba(0,0,0,.55);overflow:hidden}
 .product-editor-head{position:sticky;top:0;z-index:3;background:rgba(11,18,25,.97);backdrop-filter:blur(8px);border-bottom:1px solid rgba(124,174,208,.16)}
 .product-editor-body{display:grid;gap:20px;padding:24px}
@@ -41,7 +41,7 @@
   .product-editor-grid-2,.product-editor-grid-3{grid-template-columns:1fr}
   .product-editor-section .section-line{align-items:flex-start;flex-direction:column}
   .product-editor-spec-row{grid-template-columns:1fr 1fr 40px}
-  .product-edit-trigger{top:10px;right:10px}
+  .product-edit-trigger{right:10px}
 }
 
 @media(max-width:520px){
