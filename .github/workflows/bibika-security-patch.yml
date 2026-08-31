@@ -1,0 +1,91 @@
+name: Bibika security patch
+
+on:
+  push:
+    branches: [bibika-admin-v1]
+    paths:
+      - .github/workflows/bibika-security-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bibika-admin-v1
+      - name: Patch Bibika security
+        shell: python
+        run: |
+          from pathlib import Path
+
+          worker_path = Path('bibika/_worker.js')
+          worker = worker_path.read_text()
+
+          marker = 'const BIBIKA_IMAGE_RE = /^assets\\/images\\/[a-z0-9-]+-(cover|gallery|icon|page)-\\d{14}-[a-f0-9]{8}\\.webp$/;\n'
+          security = marker + '''const RELEASE_PLATFORM_EXTENSIONS = {\n  android: [".apk", ".aab"],\n  windows: [".exe", ".msi", ".zip"],\n  macos: [".dmg", ".pkg", ".zip"],\n  linux: [".appimage", ".deb", ".rpm", ".zip", ".tar.gz"],\n  ios: [".ipa"],\n  other: null,\n};\nconst FORBIDDEN_RELEASE_EXTENSIONS = new Set([\n  ".html", ".htm", ".xhtml", ".js", ".mjs", ".cjs", ".svg", ".xml",\n  ".php", ".php3", ".php4", ".php5", ".phtml", ".shtml", ".asp", ".aspx", ".jsp"\n]);\nconst FORBIDDEN_RELEASE_CONTENT_TYPES = new Set([\n  "text/html", "application/xhtml+xml", "image/svg+xml", "application/javascript",\n  "text/javascript", "application/x-javascript", "application/x-httpd-php"\n]);\nconst BIBIKA_CSP = [\n  "default-src 'self'",\n  "base-uri 'self'",\n  "object-src 'none'",\n  "frame-ancestors 'none'",\n  "form-action 'self'",\n  "script-src 'self'",\n  "script-src-attr 'unsafe-inline'",\n  "style-src 'self' 'unsafe-inline' https://kiananstudio.com https://fonts.googleapis.com",\n  "img-src 'self' data: blob: https://kiananstudio.com https://github.com https://avatars.githubusercontent.com https://raw.githubusercontent.com",\n  "font-src 'self' data: https://kiananstudio.com https://fonts.gstatic.com",\n  "connect-src 'self' https://api.github.com https://github.com",\n  "media-src 'self' blob: https://kiananstudio.com",\n  "worker-src 'self' blob:",\n  "frame-src 'none'",\n  "manifest-src 'self'",\n  "upgrade-insecure-requests",\n].join("; ");\n'''
+          if marker not in worker:
+              raise SystemExit('worker constants marker not found')
+          worker = worker.replace(marker, security, 1)
+
+          marker = '''function normalizeImagePath(value) {\n'''
+          helpers = '''function releaseExtension(value) {\n  const name = String(value || "").trim().toLowerCase();\n  if (name.endsWith(".tar.gz")) return ".tar.gz";\n  const dot = name.lastIndexOf(".");\n  return dot >= 0 ? name.slice(dot) : "";\n}\n\nfunction validateReleaseUpload(platform, requestedName, contentType, declaredLength, clientDeclaredLength) {\n  if (!Object.prototype.hasOwnProperty.call(RELEASE_PLATFORM_EXTENSIONS, platform)) {\n    return "Некорректная платформа файла.";\n  }\n  if (!requestedName || requestedName.length > 180 || /[\\\\/\\0]/.test(requestedName)) {\n    return "Некорректное имя файла.";\n  }\n\n  const extension = releaseExtension(requestedName);\n  if (!extension) return "У файла должно быть расширение.";\n  const allowed = RELEASE_PLATFORM_EXTENSIONS[platform];\n  if (allowed && !allowed.includes(extension)) {\n    return `Расширение ${extension} не разрешено для платформы ${platform}.`;\n  }\n  if (!allowed && FORBIDDEN_RELEASE_EXTENSIONS.has(extension)) {\n    return "Этот тип файла запрещён для загрузки через Bibika.";\n  }\n  if (FORBIDDEN_RELEASE_CONTENT_TYPES.has(contentType)) {\n    return "Этот Content-Type запрещён для загрузки через Bibika.";\n  }\n\n  if (!Number.isFinite(clientDeclaredLength) || clientDeclaredLength <= 0) {\n    return "Не удалось определить размер файла.";\n  }\n  if (clientDeclaredLength > MAX_RELEASE_FILE_BYTES || declaredLength > MAX_RELEASE_FILE_BYTES) {\n    return "Файл слишком большой для загрузки через Bibika. Максимум 90 МБ.";\n  }\n  if (declaredLength > 0 && declaredLength !== clientDeclaredLength) {\n    return "Размер файла не совпадает с размером запроса.";\n  }\n  return null;\n}\n\nfunction limitReleaseBody(body, maxBytes) {\n  let total = 0;\n  return body.pipeThrough(new TransformStream({\n    transform(chunk, controller) {\n      total += Number(chunk?.byteLength || 0);\n      if (total > maxBytes) {\n        controller.error(new Error("BIBIKA_RELEASE_TOO_LARGE"));\n        return;\n      }\n      controller.enqueue(chunk);\n    }\n  }));\n}\n\nfunction normalizeImagePath(value) {\n'''
+          if marker not in worker:
+              raise SystemExit('worker helper marker not found')
+          worker = worker.replace(marker, helpers, 1)
+
+          old = '''  const platform = sanitizeSlug(request.headers.get("X-Bibika-Platform"), "file");\n  const version = decodeHeaderValue(request.headers.get("X-Bibika-Version")).trim();\n  const requestedName = decodeHeaderValue(request.headers.get("X-Bibika-File-Name"));\n  if (!version) return jsonResponse({ error: "Не указана версия файла." }, 400);\n  if (!requestedName) return jsonResponse({ error: "Не указано имя файла." }, 400);\n\n  const declaredLength = Number(request.headers.get("Content-Length") || 0);\n  if (declaredLength > MAX_RELEASE_FILE_BYTES) {\n    return jsonResponse({ error: "Файл слишком большой для загрузки через Bibika. Максимум 90 МБ." }, 413);\n  }\n\n  const cleanVersion = sanitizeReleaseVersion(version);\n  const tag = `${pageId}-v${cleanVersion}`;\n  const baseName = sanitizeAssetName(requestedName, `${pageId}-${platform}-${cleanVersion}.bin`);\n  const contentType = String(request.headers.get("Content-Type") || "application/octet-stream").split(";", 1)[0].trim() || "application/octet-stream";\n'''
+          new = '''  const platform = String(request.headers.get("X-Bibika-Platform") || "").trim().toLowerCase();\n  const version = decodeHeaderValue(request.headers.get("X-Bibika-Version")).trim();\n  const requestedName = decodeHeaderValue(request.headers.get("X-Bibika-File-Name"));\n  if (!version) return jsonResponse({ error: "Не указана версия файла." }, 400);\n  if (!requestedName) return jsonResponse({ error: "Не указано имя файла." }, 400);\n\n  const declaredLength = Number(request.headers.get("Content-Length") || 0);\n  const clientDeclaredLength = Number(request.headers.get("X-Bibika-File-Size") || 0);\n  const contentType = String(request.headers.get("Content-Type") || "application/octet-stream").split(";", 1)[0].trim().toLowerCase() || "application/octet-stream";\n  const validationError = validateReleaseUpload(platform, requestedName, contentType, declaredLength, clientDeclaredLength);\n  if (validationError) {\n    const status = /слишком большой/i.test(validationError) ? 413 : 400;\n    return jsonResponse({ error: validationError }, status);\n  }\n\n  const cleanVersion = sanitizeReleaseVersion(version);\n  const tag = `${pageId}-v${cleanVersion}`;\n  const baseName = sanitizeAssetName(requestedName, `${pageId}-${platform}-${cleanVersion}.bin`);\n'''
+          if old not in worker:
+              raise SystemExit('release validation target not found')
+          worker = worker.replace(old, new, 1)
+
+          old = '''      body: request.body,\n    });\n'''
+          new = '''      body: limitReleaseBody(request.body, MAX_RELEASE_FILE_BYTES),\n    });\n'''
+          if old not in worker:
+              raise SystemExit('release stream target not found')
+          worker = worker.replace(old, new, 1)
+
+          old = '''    if (!response.ok) {\n      const error = new Error(payload.message || `GitHub upload HTTP ${response.status}`);\n      error.status = response.status;\n      throw error;\n    }\n    return jsonResponse({\n'''
+          new = '''    if (!response.ok) {\n      const error = new Error(payload.message || `GitHub upload HTTP ${response.status}`);\n      error.status = response.status;\n      throw error;\n    }\n    if (Number(payload.size || 0) > MAX_RELEASE_FILE_BYTES) {\n      await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/assets/${payload.id}`, {\n        method: "DELETE",\n        headers: githubHeaders(env),\n      }).catch(() => null);\n      return jsonResponse({ error: "Файл слишком большой для загрузки через Bibika. Максимум 90 МБ." }, 413);\n    }\n    return jsonResponse({\n'''
+          if old not in worker:
+              raise SystemExit('release response target not found')
+          worker = worker.replace(old, new, 1)
+
+          old = '''  } catch (error) {\n    return jsonResponse({ error: `Не удалось загрузить файл в GitHub Releases: ${error.message}` }, 502);\n  }\n}\n\nasync function handleReleaseAssetDeleteApi'''
+          new = '''  } catch (error) {\n    if (error?.message === "BIBIKA_RELEASE_TOO_LARGE") {\n      return jsonResponse({ error: "Файл слишком большой для загрузки через Bibika. Максимум 90 МБ." }, 413);\n    }\n    return jsonResponse({ error: `Не удалось загрузить файл в GitHub Releases: ${error.message}` }, 502);\n  }\n}\n\nasync function handleReleaseAssetDeleteApi'''
+          if old not in worker:
+              raise SystemExit('release catch target not found')
+          worker = worker.replace(old, new, 1)
+
+          old = '''  headers.set("Cache-Control", "no-store");\n\n  const contentType = response.headers.get("Content-Type") || "";\n'''
+          new = '''  headers.set("Cache-Control", "no-store");\n  headers.set("Content-Security-Policy", BIBIKA_CSP);\n\n  const contentType = response.headers.get("Content-Type") || "";\n'''
+          if old not in worker:
+              raise SystemExit('CSP header target not found')
+          worker = worker.replace(old, new, 1)
+
+          old = '''    const additions = `<script defer src="/image-editor.js?v=1"></script><script defer src="/image-cleanup.js?v=1"></script><script defer src="/text-page-files.js?v=1"></script><script defer src="/text-page-blocks.js?v=1"></script><script>window.addEventListener("DOMContentLoaded",function(){try{publishData=function(nextState,message){return requestJson("/api/catalog",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({data:nextState,message:message})});};}catch(e){console.error("Bibika publish hotfix",e);}});</script>`;\n'''
+          new = '''    const additions = `<script defer src="/image-editor.js?v=1"></script><script defer src="/image-cleanup.js?v=1"></script><script defer src="/text-page-files.js?v=1"></script><script defer src="/text-page-blocks.js?v=1"></script><script defer src="/publish-hotfix.js?v=1"></script>`;\n'''
+          if old not in worker:
+              raise SystemExit('inline hotfix target not found')
+          worker = worker.replace(old, new, 1)
+
+          worker_path.write_text(worker)
+
+          files_path = Path('bibika/text-page-files.js')
+          files = files_path.read_text()
+          old = "          'Content-Type': file.type || 'application/octet-stream',\n          'X-Bibika-Page': pageId,\n"
+          new = "          'Content-Type': file.type || 'application/octet-stream',\n          'X-Bibika-File-Size': String(file.size),\n          'X-Bibika-Page': pageId,\n"
+          if old not in files:
+              raise SystemExit('file size header target not found')
+          files_path.write_text(files.replace(old, new, 1))
+
+      - name: Commit patch
+        run: |
+          git config user.name "kiananstudio"
+          git config user.email "konan1517@gmail.com"
+          git add bibika/_worker.js bibika/text-page-files.js
+          git commit -m "Harden Bibika CSP and release uploads"
+          git push origin bibika-admin-v1
