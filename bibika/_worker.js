@@ -7,8 +7,11 @@ const GITHUB_API = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_RELEASE_FILE_BYTES = 90 * 1024 * 1024;
 const MAX_CLEANUP_PATHS = 30;
+const LOGIN_MAX_FAILURES = 3;
+const LOGIN_WINDOW_SECONDS = 180;
 const LOGIN_BLOCK_SECONDS = 180;
 const BIBIKA_IMAGE_RE = /^assets\/images\/[a-z0-9-]+-(cover|gallery|icon|page)-\d{14}-[a-f0-9]{8}\.webp$/;
+let authDbReady = false;
 
 function unauthorized() {
   return new Response("Authentication required", {
@@ -21,11 +24,12 @@ function unauthorized() {
   });
 }
 
-function tooManyLoginAttempts() {
+function tooManyLoginAttempts(retryAfter = LOGIN_BLOCK_SECONDS) {
+  const seconds = Math.max(1, Math.min(LOGIN_BLOCK_SECONDS, Number(retryAfter) || LOGIN_BLOCK_SECONDS));
   return new Response("Too many failed login attempts. Try again in 3 minutes.", {
     status: 429,
     headers: {
-      "Retry-After": String(LOGIN_BLOCK_SECONDS),
+      "Retry-After": String(seconds),
       "Cache-Control": "no-store",
       "Content-Type": "text/plain; charset=utf-8",
       "X-Content-Type-Options": "nosniff",
@@ -33,17 +37,115 @@ function tooManyLoginAttempts() {
   });
 }
 
-async function rejectFailedLogin(request, env) {
-  const limiter = env.BIBIKA_LOGIN_RATE_LIMITER;
-  if (!limiter || typeof limiter.limit !== "function") return unauthorized();
+function clientIp(request) {
+  return String(request.headers.get("CF-Connecting-IP") || "unknown").trim() || "unknown";
+}
 
-  const ip = String(request.headers.get("CF-Connecting-IP") || "unknown").trim() || "unknown";
-  try {
-    const { success } = await limiter.limit({ key: `bibika-login:${ip}` });
-    if (!success) return tooManyLoginAttempts();
-  } catch (error) {
-    console.error("Bibika login rate limiter error", error);
+function authGatePath(url) {
+  const path = String(url?.pathname || "/").toLowerCase();
+  if (path.startsWith("/api/")) return true;
+  if (path === "/" || path.endsWith(".html")) return true;
+  const tail = path.split("/").pop() || "";
+  return !tail.includes(".");
+}
+
+async function authDb(env) {
+  const db = env.BIBIKA_AUTH_DB;
+  if (!db || typeof db.prepare !== "function") return null;
+  if (!authDbReady) {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS bibika_login_attempts (
+        ip TEXT PRIMARY KEY,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        window_started INTEGER NOT NULL DEFAULT 0,
+        blocked_until INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL DEFAULT 0
+      )
+    `).run();
+    authDbReady = true;
   }
+  return db;
+}
+
+async function activeLoginBlock(request, env) {
+  try {
+    const db = await authDb(env);
+    if (!db) return null;
+    const now = Math.floor(Date.now() / 1000);
+    const row = await db.prepare(
+      "SELECT blocked_until FROM bibika_login_attempts WHERE ip = ?1"
+    ).bind(clientIp(request)).first();
+    const blockedUntil = Number(row?.blocked_until || 0);
+    if (blockedUntil > now) {
+      return { blockedUntil, retryAfter: blockedUntil - now };
+    }
+    return null;
+  } catch (error) {
+    console.error("Bibika auth DB block check failed", error);
+    return null;
+  }
+}
+
+async function recordFailedLogin(request, env) {
+  try {
+    const db = await authDb(env);
+    if (!db) return null;
+    const now = Math.floor(Date.now() / 1000);
+    const result = await db.prepare(`
+      INSERT INTO bibika_login_attempts (ip, attempts, window_started, blocked_until, updated_at)
+      VALUES (?1, 1, ?2, 0, ?2)
+      ON CONFLICT(ip) DO UPDATE SET
+        attempts = CASE
+          WHEN blocked_until > ?2 THEN attempts
+          WHEN (?2 - window_started) >= ?3 THEN 1
+          ELSE attempts + 1
+        END,
+        window_started = CASE
+          WHEN blocked_until > ?2 THEN window_started
+          WHEN (?2 - window_started) >= ?3 THEN ?2
+          ELSE window_started
+        END,
+        blocked_until = CASE
+          WHEN blocked_until > ?2 THEN blocked_until
+          WHEN (?2 - window_started) >= ?3 THEN 0
+          WHEN attempts + 1 >= ?4 THEN ?2 + ?5
+          ELSE 0
+        END,
+        updated_at = ?2
+      RETURNING attempts, blocked_until
+    `).bind(
+      clientIp(request),
+      now,
+      LOGIN_WINDOW_SECONDS,
+      LOGIN_MAX_FAILURES,
+      LOGIN_BLOCK_SECONDS
+    ).run();
+    const row = Array.isArray(result?.results) ? result.results[0] : null;
+    const blockedUntil = Number(row?.blocked_until || 0);
+    return {
+      attempts: Number(row?.attempts || 1),
+      blockedUntil,
+      retryAfter: blockedUntil > now ? blockedUntil - now : 0,
+    };
+  } catch (error) {
+    console.error("Bibika auth DB failure record failed", error);
+    return null;
+  }
+}
+
+async function clearLoginFailures(request, env) {
+  try {
+    const db = await authDb(env);
+    if (!db) return;
+    await db.prepare("DELETE FROM bibika_login_attempts WHERE ip = ?1").bind(clientIp(request)).run();
+  } catch (error) {
+    console.error("Bibika auth DB reset failed", error);
+  }
+}
+
+async function rejectFailedLogin(request, env) {
+  const state = await recordFailedLogin(request, env);
+  if (state?.blockedUntil) return tooManyLoginAttempts(state.retryAfter);
   return unauthorized();
 }
 
@@ -602,6 +704,13 @@ async function handleRequest(request, env) {
 
   const authorization = request.headers.get("Authorization");
   if (!authorization) return unauthorized();
+
+  const url = new URL(request.url);
+  if (authGatePath(url)) {
+    const blocked = await activeLoginBlock(request, env);
+    if (blocked) return tooManyLoginAttempts(blocked.retryAfter);
+  }
+
   if (!authorization.startsWith("Basic ")) return rejectFailedLogin(request, env);
 
   let credentials;
@@ -616,7 +725,8 @@ async function handleRequest(request, env) {
     return rejectFailedLogin(request, env);
   }
 
-  const url = new URL(request.url);
+  if (authGatePath(url)) await clearLoginFailures(request, env);
+
   if (url.pathname.startsWith("/api/")) {
     const csrfError = validateCsrfRequest(request, url);
     if (csrfError) return csrfError;
