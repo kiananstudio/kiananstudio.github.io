@@ -505,6 +505,7 @@
         credentials: 'same-origin',
         headers: {
           'Content-Type': file.type || 'application/octet-stream',
+          'X-Bibika-File-Size': String(file.size),
           'X-Bibika-Page': pageId,
           'X-Bibika-Title': encodeURIComponent(title),
           'X-Bibika-Platform': platform,

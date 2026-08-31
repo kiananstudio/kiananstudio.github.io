@@ -11,6 +11,40 @@ const LOGIN_MAX_FAILURES = 3;
 const LOGIN_WINDOW_SECONDS = 180;
 const LOGIN_BLOCK_SECONDS = 180;
 const BIBIKA_IMAGE_RE = /^assets\/images\/[a-z0-9-]+-(cover|gallery|icon|page)-\d{14}-[a-f0-9]{8}\.webp$/;
+const RELEASE_PLATFORM_EXTENSIONS = {
+  android: [".apk", ".aab"],
+  windows: [".exe", ".msi", ".zip"],
+  macos: [".dmg", ".pkg", ".zip"],
+  linux: [".appimage", ".deb", ".rpm", ".zip", ".tar.gz"],
+  ios: [".ipa"],
+  other: null,
+};
+const FORBIDDEN_RELEASE_EXTENSIONS = new Set([
+  ".html", ".htm", ".xhtml", ".js", ".mjs", ".cjs", ".svg", ".xml",
+  ".php", ".php3", ".php4", ".php5", ".phtml", ".shtml", ".asp", ".aspx", ".jsp"
+]);
+const FORBIDDEN_RELEASE_CONTENT_TYPES = new Set([
+  "text/html", "application/xhtml+xml", "image/svg+xml", "application/javascript",
+  "text/javascript", "application/x-javascript", "application/x-httpd-php"
+]);
+const BIBIKA_CSP = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "script-src 'self'",
+  "script-src-attr 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://kiananstudio.com https://fonts.googleapis.com",
+  "img-src 'self' data: blob: https://kiananstudio.com https://github.com https://avatars.githubusercontent.com https://raw.githubusercontent.com",
+  "font-src 'self' data: https://kiananstudio.com https://fonts.gstatic.com",
+  "connect-src 'self' https://api.github.com https://github.com",
+  "media-src 'self' blob: https://kiananstudio.com",
+  "worker-src 'self' blob:",
+  "frame-src 'none'",
+  "manifest-src 'self'",
+  "upgrade-insecure-requests",
+].join("; ");
 let authDbReady = false;
 
 function unauthorized() {
@@ -265,6 +299,60 @@ function uniqueAssetName(name, assets = []) {
   const dot = name.lastIndexOf(".");
   if (dot > 0) return `${name.slice(0, dot)}-${stamp}${name.slice(dot)}`;
   return `${name}-${stamp}`;
+}
+
+function releaseExtension(value) {
+  const name = String(value || "").trim().toLowerCase();
+  if (name.endsWith(".tar.gz")) return ".tar.gz";
+  const dot = name.lastIndexOf(".");
+  return dot >= 0 ? name.slice(dot) : "";
+}
+
+function validateReleaseUpload(platform, requestedName, contentType, declaredLength, clientDeclaredLength) {
+  if (!Object.prototype.hasOwnProperty.call(RELEASE_PLATFORM_EXTENSIONS, platform)) {
+    return "Некорректная платформа файла.";
+  }
+  if (!requestedName || requestedName.length > 180 || /[\\/\0]/.test(requestedName)) {
+    return "Некорректное имя файла.";
+  }
+
+  const extension = releaseExtension(requestedName);
+  if (!extension) return "У файла должно быть расширение.";
+  const allowed = RELEASE_PLATFORM_EXTENSIONS[platform];
+  if (allowed && !allowed.includes(extension)) {
+    return `Расширение ${extension} не разрешено для платформы ${platform}.`;
+  }
+  if (!allowed && FORBIDDEN_RELEASE_EXTENSIONS.has(extension)) {
+    return "Этот тип файла запрещён для загрузки через Bibika.";
+  }
+  if (FORBIDDEN_RELEASE_CONTENT_TYPES.has(contentType)) {
+    return "Этот Content-Type запрещён для загрузки через Bibika.";
+  }
+
+  if (!Number.isFinite(clientDeclaredLength) || clientDeclaredLength <= 0) {
+    return "Не удалось определить размер файла.";
+  }
+  if (clientDeclaredLength > MAX_RELEASE_FILE_BYTES || declaredLength > MAX_RELEASE_FILE_BYTES) {
+    return "Файл слишком большой для загрузки через Bibika. Максимум 90 МБ.";
+  }
+  if (declaredLength > 0 && declaredLength !== clientDeclaredLength) {
+    return "Размер файла не совпадает с размером запроса.";
+  }
+  return null;
+}
+
+function limitReleaseBody(body, maxBytes) {
+  let total = 0;
+  return body.pipeThrough(new TransformStream({
+    transform(chunk, controller) {
+      total += Number(chunk?.byteLength || 0);
+      if (total > maxBytes) {
+        controller.error(new Error("BIBIKA_RELEASE_TOO_LARGE"));
+        return;
+      }
+      controller.enqueue(chunk);
+    }
+  }));
 }
 
 function normalizeImagePath(value) {
@@ -617,21 +705,24 @@ async function handleReleaseUploadApi(request, env) {
 
   const pageId = sanitizeSlug(request.headers.get("X-Bibika-Page"), "app");
   const title = decodeHeaderValue(request.headers.get("X-Bibika-Title")) || pageId;
-  const platform = sanitizeSlug(request.headers.get("X-Bibika-Platform"), "file");
+  const platform = String(request.headers.get("X-Bibika-Platform") || "").trim().toLowerCase();
   const version = decodeHeaderValue(request.headers.get("X-Bibika-Version")).trim();
   const requestedName = decodeHeaderValue(request.headers.get("X-Bibika-File-Name"));
   if (!version) return jsonResponse({ error: "Не указана версия файла." }, 400);
   if (!requestedName) return jsonResponse({ error: "Не указано имя файла." }, 400);
 
   const declaredLength = Number(request.headers.get("Content-Length") || 0);
-  if (declaredLength > MAX_RELEASE_FILE_BYTES) {
-    return jsonResponse({ error: "Файл слишком большой для загрузки через Bibika. Максимум 90 МБ." }, 413);
+  const clientDeclaredLength = Number(request.headers.get("X-Bibika-File-Size") || 0);
+  const contentType = String(request.headers.get("Content-Type") || "application/octet-stream").split(";", 1)[0].trim().toLowerCase() || "application/octet-stream";
+  const validationError = validateReleaseUpload(platform, requestedName, contentType, declaredLength, clientDeclaredLength);
+  if (validationError) {
+    const status = /слишком большой/i.test(validationError) ? 413 : 400;
+    return jsonResponse({ error: validationError }, status);
   }
 
   const cleanVersion = sanitizeReleaseVersion(version);
   const tag = `${pageId}-v${cleanVersion}`;
   const baseName = sanitizeAssetName(requestedName, `${pageId}-${platform}-${cleanVersion}.bin`);
-  const contentType = String(request.headers.get("Content-Type") || "application/octet-stream").split(";", 1)[0].trim() || "application/octet-stream";
 
   try {
     const release = await getOrCreateRelease(env, tag, title, version);
@@ -643,13 +734,20 @@ async function handleReleaseUploadApi(request, env) {
         ...githubHeaders(env),
         "Content-Type": contentType,
       },
-      body: request.body,
+      body: limitReleaseBody(request.body, MAX_RELEASE_FILE_BYTES),
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       const error = new Error(payload.message || `GitHub upload HTTP ${response.status}`);
       error.status = response.status;
       throw error;
+    }
+    if (Number(payload.size || 0) > MAX_RELEASE_FILE_BYTES) {
+      await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/assets/${payload.id}`, {
+        method: "DELETE",
+        headers: githubHeaders(env),
+      }).catch(() => null);
+      return jsonResponse({ error: "Файл слишком большой для загрузки через Bibika. Максимум 90 МБ." }, 413);
     }
     return jsonResponse({
       ok: true,
@@ -664,6 +762,9 @@ async function handleReleaseUploadApi(request, env) {
       url: payload.browser_download_url,
     });
   } catch (error) {
+    if (error?.message === "BIBIKA_RELEASE_TOO_LARGE") {
+      return jsonResponse({ error: "Файл слишком большой для загрузки через Bibika. Максимум 90 МБ." }, 413);
+    }
     return jsonResponse({ error: `Не удалось загрузить файл в GitHub Releases: ${error.message}` }, 502);
   }
 }
@@ -763,11 +864,12 @@ async function handleRequest(request, env) {
   headers.set("X-Frame-Options", "DENY");
   headers.set("Referrer-Policy", "no-referrer");
   headers.set("Cache-Control", "no-store");
+  headers.set("Content-Security-Policy", BIBIKA_CSP);
 
   const contentType = response.headers.get("Content-Type") || "";
   if (contentType.includes("text/html")) {
     const html = await response.text();
-    const additions = `<script defer src="/image-editor.js?v=1"></script><script defer src="/image-cleanup.js?v=1"></script><script defer src="/text-page-files.js?v=1"></script><script defer src="/text-page-blocks.js?v=1"></script><script>window.addEventListener("DOMContentLoaded",function(){try{publishData=function(nextState,message){return requestJson("/api/catalog",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({data:nextState,message:message})});};}catch(e){console.error("Bibika publish hotfix",e);}});</script>`;
+    const additions = `<script defer src="/image-editor.js?v=1"></script><script defer src="/image-cleanup.js?v=1"></script><script defer src="/text-page-files.js?v=1"></script><script defer src="/text-page-blocks.js?v=1"></script><script defer src="/publish-hotfix.js?v=1"></script>`;
     const patched = html.includes("</body>") ? html.replace("</body>", `${additions}</body>`) : `${html}${additions}`;
     return new Response(patched, { status: response.status, statusText: response.statusText, headers });
   }
