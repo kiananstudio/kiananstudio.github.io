@@ -34,26 +34,25 @@
     button.id = 'bibika-logout';
     button.type = 'button';
     button.textContent = 'Выйти';
-    button.addEventListener('click', async () => {
+    button.addEventListener('click', () => {
       if (button.disabled) return;
       button.disabled = true;
-      const previousText = button.textContent;
       button.textContent = 'Выход…';
 
       try {
-        const response = await fetch('/logout', {
+        fetch('/logout', {
           method: 'POST',
           credentials: 'same-origin',
-          cache: 'no-store'
+          cache: 'no-store',
+          keepalive: true
+        }).catch((error) => {
+          console.error('Bibika logout request failed', error);
         });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        await response.text();
+      } finally {
+        // Leave the protected origin immediately. This prevents the browser
+        // from challenging for Basic Auth again after Clear-Site-Data removes
+        // the cached HTTP credentials from the logout response.
         window.location.replace(PUBLIC_ORIGIN + '/');
-      } catch (error) {
-        console.error('Bibika logout failed', error);
-        button.disabled = false;
-        button.textContent = previousText;
-        window.alert('Не удалось выйти из Bibika. Попробуй ещё раз.');
       }
     });
 
