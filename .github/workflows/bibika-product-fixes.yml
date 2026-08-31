@@ -1,0 +1,134 @@
+name: Bibika product fixes
+
+on:
+  push:
+    branches: [bibika-admin-v1]
+    paths:
+      - .github/workflows/bibika-product-fixes.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bibika-admin-v1
+          fetch-depth: 0
+
+      - name: Patch Bibika product editing
+        shell: python
+        run: |
+          from pathlib import Path
+
+          # 1) Product page: show every field that the editor can change.
+          p = Path('bibika/product-page.js')
+          s = p.read_text()
+          old = "      const features = (product.features || []).map(item => `<li>${escapeHtml(item)}</li>`).join('');\n      const distribution = product.distribution || { type: 'external', repository: '', downloads: [] };\n"
+          new = "      const about = String(product.description || '').trim();\n      const features = (product.features || []).map(item => `<li>${escapeHtml(item)}</li>`).join('');\n      const specs = (Array.isArray(product.specs) ? product.specs : [])\n        .filter(pair => Array.isArray(pair) && String(pair[0] || '').trim() && String(pair[1] || '').trim())\n        .map(pair => `<li><strong>${escapeHtml(pair[0])}:</strong> ${escapeHtml(pair[1])}</li>`).join('');\n      const distribution = product.distribution || { type: 'external', repository: '', downloads: [] };\n"
+          if old not in s:
+              raise SystemExit('bibika product-page features marker not found')
+          s = s.replace(old, new, 1)
+          old = "            <p class=\"product-lead\">${escapeHtml(product.description || product.shortDescription || '')}</p>\n"
+          new = "            <p class=\"product-lead\">${escapeHtml(product.shortDescription || product.description || '')}</p>\n"
+          if old not in s:
+              raise SystemExit('bibika product-page lead marker not found')
+          s = s.replace(old, new, 1)
+          old = "        ${downloads ? `<section class=\"product-content-section\" id=\"downloads\"><span class=\"eyebrow\">Downloads</span><h2>Choose your platform.</h2><div class=\"download-grid\">${downloads}</div></section>` : ''}\n        ${features ? `<section class=\"product-content-section\"><span class=\"eyebrow\">Features</span><h2>What it includes.</h2><ul class=\"feature-list product-feature-list\">${features}</ul></section>` : ''}\n        ${gallery ? `<section class=\"product-content-section\"><span class=\"eyebrow\">Media</span><h2>Screenshots.</h2><div class=\"product-gallery\">${gallery}</div></section>` : ''}`;\n"
+          new = "        ${about ? `<section class=\"product-content-section\"><span class=\"eyebrow\">About</span><h2>About the product.</h2><p class=\"product-lead\">${escapeHtml(about)}</p></section>` : ''}\n        ${downloads ? `<section class=\"product-content-section\" id=\"downloads\"><span class=\"eyebrow\">Downloads</span><h2>Choose your platform.</h2><div class=\"download-grid\">${downloads}</div></section>` : ''}\n        ${features ? `<section class=\"product-content-section\"><span class=\"eyebrow\">Features</span><h2>What it includes.</h2><ul class=\"feature-list product-feature-list\">${features}</ul></section>` : ''}\n        ${specs ? `<section class=\"product-content-section\"><span class=\"eyebrow\">Specifications</span><h2>Product details.</h2><ul class=\"feature-list product-feature-list\">${specs}</ul></section>` : ''}\n        ${gallery ? `<section class=\"product-content-section\"><span class=\"eyebrow\">Media</span><h2>Screenshots.</h2><div class=\"product-gallery\">${gallery}</div></section>` : ''}`;\n"
+          if old not in s:
+              raise SystemExit('bibika product-page sections marker not found')
+          p.write_text(s)
+
+          # 2) Existing product editor: add deletion and make save refresh reliably.
+          p = Path('bibika/product-editor.js')
+          s = p.read_text()
+          old = "        <footer class=\"modal-actions product-editor-actions\">\n          <button type=\"button\" class=\"btn btn-ghost\" id=\"cancel-editor\">Отмена</button>\n          <button type=\"button\" class=\"btn btn-primary\" id=\"save-editor\">Сохранить изменения</button>\n        </footer>\n"
+          new = "        <footer class=\"modal-actions product-editor-actions\">\n          <button type=\"button\" class=\"btn btn-danger\" id=\"delete-product\">Удалить продукт</button>\n          <button type=\"button\" class=\"btn btn-ghost\" id=\"cancel-editor\">Отмена</button>\n          <button type=\"button\" class=\"btn btn-primary\" id=\"save-editor\">Сохранить изменения</button>\n        </footer>\n"
+          if old not in s:
+              raise SystemExit('product editor footer marker not found')
+          s = s.replace(old, new, 1)
+
+          marker = "  function removeRow(target) {\n"
+          delete_fn = '''  async function deleteProduct() {\n    if (saving || !currentProduct) return;\n    const name = String(currentProduct.title || currentProduct.id || 'этот продукт');\n    if (!confirm(`Удалить продукт «${name}»? Продукт исчезнет с сайта. Это действие нельзя отменить.`)) return;\n\n    const save = q('#save-editor');\n    const cancel = q('#cancel-editor');\n    const close = q('#close-editor');\n    const remove = q('#delete-product');\n    const state = q('#product-editor-state');\n    saving = true;\n    [save, cancel, close, remove].forEach(button => { if (button) button.disabled = true; });\n    if (remove) remove.textContent = 'Удаление…';\n    if (state) state.textContent = 'Удаляю продукт из каталога…';\n\n    try {\n      const latest = await fetchCatalog();\n      const index = (Array.isArray(latest.products) ? latest.products : []).findIndex(item => String(item?.id || '') === productId);\n      if (index < 0) throw new Error('Продукт уже отсутствует в каталоге.');\n      const category = String(latest.products[index]?.category || currentProduct.category || 'unity-tools');\n      latest.products.splice(index, 1);\n\n      const response = await fetch(API_URL, {\n        method: 'POST',\n        cache: 'no-store',\n        credentials: 'same-origin',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({ data: latest, message: `Bibika: delete product ${productId}` })\n      });\n      const result = await response.json().catch(() => ({}));\n      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);\n\n      showToast('Продукт удалён из каталога.');\n      location.href = `category.html?category=${encodeURIComponent(category)}&t=${Date.now()}`;\n      return;\n    } catch (error) {\n      if (state) state.textContent = `Ошибка: ${error.message}`;\n      showToast(`Не удалось удалить продукт: ${error.message}`, 6200);\n    } finally {\n      saving = false;\n      [save, cancel, close, remove].forEach(button => { if (button) button.disabled = false; });\n      if (remove) remove.textContent = 'Удалить продукт';\n    }\n  }\n\n  function removeRow(target) {\n'''
+          if marker not in s:
+              raise SystemExit('product editor remove-row marker not found')
+          s = s.replace(marker, delete_fn, 1)
+          old = "    q('#save-editor')?.addEventListener('click', saveEditor);\n    q('#cancel-editor')?.addEventListener('click', closeModal);\n"
+          new = "    q('#save-editor')?.addEventListener('click', saveEditor);\n    q('#delete-product')?.addEventListener('click', deleteProduct);\n    q('#cancel-editor')?.addEventListener('click', closeModal);\n"
+          if old not in s:
+              raise SystemExit('product editor bind marker not found')
+          s = s.replace(old, new, 1)
+          old = "      currentCatalog = latest;\n      currentProduct = updated;\n      state.textContent = 'Изменения сохранены.';\n      showToast('Продукт сохранён в GitHub.');\n      closeModal();\n      setTimeout(() => location.reload(), 220);\n"
+          new = "      currentCatalog = latest;\n      currentProduct = updated;\n      state.textContent = 'Изменения сохранены.';\n      showToast('Продукт сохранён в GitHub.');\n      saving = false;\n      closeModal();\n      setTimeout(() => {\n        const url = new URL(location.href);\n        url.searchParams.set('t', String(Date.now()));\n        location.replace(url.href);\n      }, 700);\n"
+          if old not in s:
+              raise SystemExit('product editor save refresh marker not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          # 3) New category products appear first, not last.
+          p = Path('bibika/category-page-editor.js')
+          s = p.read_text()
+          old = "    workingProducts.push(normalizeProduct({\n"
+          new = "    workingProducts.unshift(normalizeProduct({\n"
+          if old not in s:
+              raise SystemExit('category add-product marker not found')
+          s = s.replace(old, new, 1)
+          old = "    const last = q('.category-page-product-row-fields:last-child');\n    last?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });\n    q('.category-page-product-title', last)?.focus();\n"
+          new = "    const first = q('.category-page-product-row-fields:first-child');\n    first?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });\n    q('.category-page-product-title', first)?.focus();\n"
+          if old not in s:
+              raise SystemExit('category add-product focus marker not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          # Bump browser cache tokens.
+          p = Path('bibika/product.html')
+          s = p.read_text().replace('product-page.js?v=1', 'product-page.js?v=2').replace('product-editor.js?v=1', 'product-editor.js?v=2')
+          p.write_text(s)
+
+      - name: Check Bibika JavaScript
+        run: |
+          node --check bibika/product-page.js
+          node --check bibika/product-editor.js
+          node --check bibika/category-page-editor.js
+
+      - name: Commit Bibika fixes
+        run: |
+          git config user.name "kiananstudio"
+          git config user.email "konan1517@gmail.com"
+          git add bibika/product-page.js bibika/product-editor.js bibika/category-page-editor.js bibika/product.html
+          git commit -m "Fix Bibika product editing and ordering"
+          git push origin bibika-admin-v1
+
+      - name: Patch public product page
+        shell: bash
+        run: |
+          git fetch origin main
+          git switch main
+          git reset --hard origin/main
+          python <<'PY'
+          from pathlib import Path
+          p = Path('product.js')
+          s = p.read_text()
+          old = "      const features = (product.features || []).map(item => `<li>${escapeHtml(item)}</li>`).join('');\n      const distribution = product.distribution || { type: 'external', repository: '', downloads: [] };\n"
+          new = "      const about = String(product.description || '').trim();\n      const features = (product.features || []).map(item => `<li>${escapeHtml(item)}</li>`).join('');\n      const specs = (Array.isArray(product.specs) ? product.specs : [])\n        .filter(pair => Array.isArray(pair) && String(pair[0] || '').trim() && String(pair[1] || '').trim())\n        .map(pair => `<li><strong>${escapeHtml(pair[0])}:</strong> ${escapeHtml(pair[1])}</li>`).join('');\n      const distribution = product.distribution || { type: 'external', repository: '', downloads: [] };\n"
+          if old not in s:
+              raise SystemExit('public product features marker not found')
+          s = s.replace(old, new, 1)
+          old = "            <p class=\"product-lead\">${escapeHtml(product.description || product.shortDescription || '')}</p>\n"
+          new = "            <p class=\"product-lead\">${escapeHtml(product.shortDescription || product.description || '')}</p>\n"
+          if old not in s:
+              raise SystemExit('public product lead marker not found')
+          s = s.replace(old, new, 1)
+          old = "        ${downloads ? `<section class=\"product-content-section\" id=\"downloads\"><span class=\"eyebrow\">Downloads</span><h2>Choose your platform.</h2><div class=\"download-grid\">${downloads}</div></section>` : ''}\n        ${features ? `<section class=\"product-content-section\"><span class=\"eyebrow\">Features</span><h2>What it includes.</h2><ul class=\"feature-list product-feature-list\">${features}</ul></section>` : ''}\n        ${gallery ? `<section class=\"product-content-section\"><span class=\"eyebrow\">Media</span><h2>Screenshots.</h2><div class=\"product-gallery\">${gallery}</div></section>` : ''}\n"
+          new = "        ${about ? `<section class=\"product-content-section\"><span class=\"eyebrow\">About</span><h2>About the product.</h2><p class=\"product-lead\">${escapeHtml(about)}</p></section>` : ''}\n        ${downloads ? `<section class=\"product-content-section\" id=\"downloads\"><span class=\"eyebrow\">Downloads</span><h2>Choose your platform.</h2><div class=\"download-grid\">${downloads}</div></section>` : ''}\n        ${features ? `<section class=\"product-content-section\"><span class=\"eyebrow\">Features</span><h2>What it includes.</h2><ul class=\"feature-list product-feature-list\">${features}</ul></section>` : ''}\n        ${specs ? `<section class=\"product-content-section\"><span class=\"eyebrow\">Specifications</span><h2>Product details.</h2><ul class=\"feature-list product-feature-list\">${specs}</ul></section>` : ''}\n        ${gallery ? `<section class=\"product-content-section\"><span class=\"eyebrow\">Media</span><h2>Screenshots.</h2><div class=\"product-gallery\">${gallery}</div></section>` : ''}\n"
+          if old not in s:
+              raise SystemExit('public product sections marker not found')
+          p.write_text(s)
+          PY
+          node --check product.js
+          git add product.js
+          git commit -m "Show all editable product fields"
+          git push origin main
