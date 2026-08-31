@@ -76,7 +76,12 @@
       "cover": "",
       "gallery": [],
       "features": [],
-      "specs": [],
+      "specs": [
+        [
+          "rer",
+          "11"
+        ]
+      ],
       "links": {
         "primaryLabel": "",
         "primaryUrl": ""
