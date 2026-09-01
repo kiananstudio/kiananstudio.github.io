@@ -84,25 +84,6 @@
       "icon": ""
     },
     {
-      "id": "gast",
-      "category": "games",
-      "title": "Gast",
-      "icon": "",
-      "status": "",
-      "version": "",
-      "shortDescription": "Gastroscopy",
-      "description": "",
-      "href": "./",
-      "cover": "",
-      "gallery": [],
-      "features": [],
-      "specs": [],
-      "links": {
-        "primaryLabel": "",
-        "primaryUrl": ""
-      }
-    },
-    {
       "id": "bronchoscopy",
       "category": "games",
       "title": "Bronchoscopy",
