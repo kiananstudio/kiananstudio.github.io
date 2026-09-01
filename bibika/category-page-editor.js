@@ -8,6 +8,7 @@
   const WEBP_QUALITY = 0.85;
   const ALLOWED_TYPES = new Set(['image/webp', 'image/png', 'image/jpeg']);
   const ALLOWED_EXTENSIONS = /\.(webp|png|jpe?g)$/i;
+  const MANAGED_PRODUCT_CATEGORIES = new Set(['unity-tools', '3d-assets']);
   const params = new URLSearchParams(location.search);
   const categoryId = String(params.get('category') || 'unity-tools').trim();
 
@@ -546,8 +547,10 @@
 
   function buildProductForSave(product, latestById, usedIds) {
     const title = String(product.title || '').trim();
-    const href = String(product.href || '').trim();
-    const hrefError = validateHref(href);
+    let href = String(product.href || '').trim();
+    const managedPage = MANAGED_PRODUCT_CATEGORIES.has(categoryId);
+    if (!href && managedPage) href = '__managed_product__';
+    const hrefError = managedPage ? '' : validateHref(href);
     if (!title) throw new Error('У каждого продукта должно быть заполнено название.');
     if (hrefError) throw new Error(`«${title}»: ${hrefError}`);
 
@@ -556,7 +559,7 @@
       latest.title = title;
       latest.icon = String(product.icon || '').trim();
       latest.shortDescription = String(product.shortDescription || '').trim();
-      latest.href = href;
+      latest.href = managedPage ? `page.html?page=${encodeURIComponent(latest.id)}` : href;
       latest.category = categoryId;
       usedIds.add(latest.id);
       return latest;
@@ -573,7 +576,8 @@
     return {
       id, category: categoryId, title,
       icon: String(product.icon || '').trim(), status: '', version: '',
-      shortDescription: String(product.shortDescription || '').trim(), description: '', href,
+      shortDescription: String(product.shortDescription || '').trim(), description: '',
+      href: managedPage ? `page.html?page=${encodeURIComponent(id)}` : href,
       cover: '', gallery: [], features: [], specs: [], links: { primaryLabel: '', primaryUrl: '' }
     };
   }
@@ -584,6 +588,45 @@
     const usedIds = new Set(existingOutside.map(item => item.id));
     const orderedCategory = workingProducts.map(product => buildProductForSave(product, latestById, usedIds));
     return [...existingOutside, ...orderedCategory];
+  }
+
+
+  function syncManagedProductPages(data, beforeProducts) {
+    if (!MANAGED_PRODUCT_CATEGORIES.has(categoryId)) return;
+    const previousIds = new Set((beforeProducts || [])
+      .filter(item => String(item?.category || '') === categoryId)
+      .map(item => String(item?.id || '').trim().toLowerCase())
+      .filter(Boolean));
+    const products = (Array.isArray(data?.products) ? data.products : [])
+      .filter(item => String(item?.category || '') === categoryId);
+    const currentIds = new Set(products.map(item => String(item?.id || '').trim().toLowerCase()).filter(Boolean));
+    let pages = Array.isArray(data?.sitePages) ? data.sitePages : [];
+
+    pages = pages.filter(page => {
+      const id = String(page?.id || '').trim().toLowerCase();
+      return !(previousIds.has(id) && !currentIds.has(id));
+    });
+
+    products.forEach(product => {
+      const id = String(product?.id || '').trim().toLowerCase();
+      if (!id) return;
+      product.href = `page.html?page=${encodeURIComponent(id)}`;
+      if (pages.some(page => String(page?.id || '').trim().toLowerCase() === id)) return;
+      const storeUrl = String(product?.links?.primaryUrl || '').trim();
+      pages.unshift({
+        id,
+        title: String(product?.title || id).trim(),
+        type: 'text',
+        heading: String(product?.title || id).trim(),
+        content: String(product?.shortDescription || '').trim(),
+        cards: [],
+        blocks: [],
+        files: [],
+        buttonPosition: 'side',
+        buttons: storeUrl ? [{ label: 'View on Unity Asset Store', href: storeUrl, style: 'primary' }] : []
+      });
+    });
+    data.sitePages = pages;
   }
 
   async function save() {
@@ -602,7 +645,9 @@
       const latestCategory = (latest.categories || []).find(item => item.id === categoryId);
       if (!latestCategory) throw new Error('Категория больше не существует.');
       latestCategory.description = q('#category-page-description-input')?.value.trim() || '';
+      const beforeProducts = Array.isArray(latest.products) ? latest.products.map(item => ({ ...item })) : [];
       latest.products = mergeWorkingProducts(Array.isArray(latest.products) ? latest.products : []);
+      syncManagedProductPages(latest, beforeProducts);
 
       const response = await fetch(API_URL, {
         method: 'POST',
