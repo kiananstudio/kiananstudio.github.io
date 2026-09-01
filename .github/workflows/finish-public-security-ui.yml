@@ -1,0 +1,34 @@
+name: Finish public security monitor UI
+
+on:
+  push:
+    branches: [bibika-admin-v1]
+    paths:
+      - .github/workflows/finish-public-security-ui.yml
+      - .github/public_security_css_patch.py
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bibika-admin-v1
+      - name: Patch CSS
+        run: python .github/public_security_css_patch.py
+      - name: Check JavaScript
+        run: |
+          node --check bibika/_worker.js
+          node --check bibika/security.js
+          node --check bibika/bibika-navigation.js
+          node --check cloudflare-public-security-collector/worker.js
+      - name: Commit UI CSS
+        run: |
+          git config user.name "kiananstudio"
+          git config user.email "konan1517@gmail.com"
+          git add bibika/security.css
+          git commit -m "Finish public site Security Monitor UI" || true
+          git push origin bibika-admin-v1
