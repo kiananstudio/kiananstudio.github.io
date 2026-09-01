@@ -106,6 +106,22 @@ function cleanSecurityText(value, maxLength = 240) {
     .slice(0, maxLength);
 }
 
+function safeSecurityPath(url) {
+  const pathname = String(url?.pathname || "/");
+  const parts = pathname.split("/").map(segment => {
+    let value = segment;
+    try { value = decodeURIComponent(segment); } catch {}
+    const compact = String(value || "").trim();
+    const tokenLike = compact.length >= 32 && (
+      /^[A-Fa-f0-9]{32,}$/.test(compact) ||
+      /^[A-Za-z0-9_-]{32,}$/.test(compact) ||
+      (compact.length >= 64 && compact.includes("."))
+    );
+    return tokenLike ? "[redacted]" : cleanSecurityText(segment, 80);
+  });
+  return parts.join("/").slice(0, 300) || "/";
+}
+
 function isSuspiciousProbePath(value) {
   const path = String(value || "").toLowerCase();
   return /(?:^|\/)(?:\.env(?:\.|\/|$)|\.git(?:\/|$)|wp-admin(?:\/|$)|wp-login\.php(?:\/|$)|xmlrpc\.php(?:\/|$)|phpmyadmin(?:\/|$)|adminer(?:\.php|\/|$)|vendor\/phpunit(?:\/|$)|cgi-bin(?:\/|$)|\.aws(?:\/|$)|actuator(?:\/|$)|server-status(?:\/|$)|config\.php(?:\/|$))/.test(path);
@@ -137,7 +153,7 @@ async function recordSecurityEvent(request, env, event = {}) {
     const url = new URL(request.url);
     const eventType = cleanSecurityText(event.eventType || "security_event", 64) || "security_event";
     const severity = new Set(["low", "medium", "high", "critical"]).has(event.severity) ? event.severity : "medium";
-    const path = cleanSecurityText(url.pathname || "/", 300) || "/";
+    const path = safeSecurityPath(url);
     const ip = cleanSecurityText(clientIp(request), 80) || "unknown";
     const dedupeSeconds = Math.max(0, Math.min(300, Number(event.dedupeSeconds ?? 5) || 0));
 
@@ -1170,7 +1186,7 @@ async function handleRequest(request, env) {
   const contentType = response.headers.get("Content-Type") || "";
   if (contentType.includes("text/html")) {
     const html = await response.text();
-    const additions = `<script defer src="/image-editor.js?v=1"></script><script defer src="/image-cleanup.js?v=1"></script><script defer src="/text-page-files.js?v=1"></script><script defer src="/text-page-blocks.js?v=2"></script><script defer src="/publish-hotfix.js?v=1"></script>`;
+    const additions = (url.pathname === "/security.html" || url.pathname === "/security") ? "" : `<script defer src="/image-editor.js?v=1"></script><script defer src="/image-cleanup.js?v=1"></script><script defer src="/text-page-files.js?v=1"></script><script defer src="/text-page-blocks.js?v=2"></script><script defer src="/publish-hotfix.js?v=1"></script>`;
     const patched = html.includes("</body>") ? html.replace("</body>", `${additions}</body>`) : `${html}${additions}`;
     return new Response(patched, { status: response.status, statusText: response.statusText, headers });
   }
