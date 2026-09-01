@@ -10,9 +10,9 @@
   <link rel="stylesheet" href="https://kiananstudio.com/styles.css" />
   <link rel="stylesheet" href="https://kiananstudio.com/layout-v2.css" />
   <link rel="stylesheet" href="visual-home.css?v=7" />
-  <link rel="stylesheet" href="security.css?v=1" />
-  <script defer src="bibika-navigation.js?v=2"></script>
-  <script defer src="security.js?v=1"></script>
+  <link rel="stylesheet" href="security.css?v=2" />
+  <script defer src="bibika-navigation.js?v=3"></script>
+  <script defer src="security.js?v=2"></script>
 </head>
 <body>
   <div class="bibika-adminbar" aria-label="Панель Bibika">
@@ -30,15 +30,11 @@
   </div>
 
   <main class="security-shell">
-    <section class="security-heading">
+    <section class="security-heading security-heading-main">
       <div>
         <span class="eyebrow">Security Monitor</span>
         <h1>Безопасность</h1>
-        <p>События, заблокированные защитой Bibika, и техническая информация об источнике запросов.</p>
-      </div>
-      <div class="security-live-status" id="security-live-status" data-level="loading">
-        <span class="security-status-dot" aria-hidden="true"></span>
-        <div><strong id="security-status-title">Загрузка…</strong><span id="security-status-note">Получаю данные из защищённого журнала.</span></div>
+        <p>Отдельный монитор защищённой Bibika и публичного kiananstudio.com. В журнал попадают только события безопасности, а не обычные посетители сайта.</p>
       </div>
     </section>
 
@@ -49,33 +45,81 @@
       <button type="button" data-period="year">Год</button>
     </section>
 
-    <section class="security-summary" aria-label="Сводка">
-      <article><span>События</span><strong id="security-total-events">—</strong></article>
-      <article><span>Уникальные IP</span><strong id="security-unique-ips">—</strong></article>
-      <article><span>Заблокированные IP</span><strong id="security-blocked-ips">—</strong></article>
-      <article><span>Высокий риск</span><strong id="security-high-events">—</strong></article>
-    </section>
-
-    <section class="security-breakdowns">
-      <article class="security-panel"><div class="security-panel-head"><strong>Типы событий</strong><span>Что именно блокировалось</span></div><div id="security-types" class="security-ranking"></div></article>
-      <article class="security-panel"><div class="security-panel-head"><strong>Страны</strong><span>По данным Cloudflare</span></div><div id="security-countries" class="security-ranking"></div></article>
-      <article class="security-panel"><div class="security-panel-head"><strong>IP-адреса</strong><span>Самые активные источники</span></div><div id="security-ips" class="security-ranking"></div></article>
-      <article class="security-panel"><div class="security-panel-head"><strong>Адреса сайта</strong><span>Куда направлялись запросы</span></div><div id="security-paths" class="security-ranking"></div></article>
-    </section>
-
-    <section class="security-panel security-events-panel">
-      <div class="security-panel-head security-events-head">
-        <div><strong>Журнал событий</strong><span id="security-events-caption">Последние события выбранного периода</span></div>
-        <span class="security-generated" id="security-generated"></span>
+    <section class="security-monitor-section" aria-labelledby="bibika-monitor-title">
+      <div class="security-section-head">
+        <div><span class="eyebrow">Protected admin</span><h2 id="bibika-monitor-title">Bibika</h2><p>Авторизация, brute force, CSRF, API-пробы и отклонённые сервером загрузки.</p></div>
+        <div class="security-live-status" id="security-live-status" data-level="loading">
+          <span class="security-status-dot" aria-hidden="true"></span>
+          <div><strong id="security-status-title">Загрузка…</strong><span id="security-status-note">Получаю данные из защищённого журнала.</span></div>
+        </div>
       </div>
-      <div id="security-events" class="security-events"></div>
-      <button type="button" id="security-load-more" class="button button-secondary security-load-more" hidden>Показать ещё</button>
+
+      <section class="security-summary" aria-label="Сводка Bibika">
+        <article><span>События</span><strong id="security-total-events">—</strong></article>
+        <article><span>Уникальные IP</span><strong id="security-unique-ips">—</strong></article>
+        <article><span>Заблокированные IP</span><strong id="security-blocked-ips">—</strong></article>
+        <article><span>Высокий риск</span><strong id="security-high-events">—</strong></article>
+      </section>
+
+      <section class="security-breakdowns">
+        <article class="security-panel"><div class="security-panel-head"><strong>Типы событий</strong><span>Что именно блокировалось</span></div><div id="security-types" class="security-ranking"></div></article>
+        <article class="security-panel"><div class="security-panel-head"><strong>Страны</strong><span>По данным Cloudflare</span></div><div id="security-countries" class="security-ranking"></div></article>
+        <article class="security-panel"><div class="security-panel-head"><strong>IP-адреса</strong><span>Самые активные источники</span></div><div id="security-ips" class="security-ranking"></div></article>
+        <article class="security-panel"><div class="security-panel-head"><strong>Адреса Bibika</strong><span>Куда направлялись запросы</span></div><div id="security-paths" class="security-ranking"></div></article>
+      </section>
+
+      <section class="security-panel security-events-panel">
+        <div class="security-panel-head security-events-head">
+          <div><strong>Журнал Bibika</strong><span id="security-events-caption">Последние события выбранного периода</span></div>
+          <span class="security-generated" id="security-generated"></span>
+        </div>
+        <div id="security-events" class="security-events"></div>
+        <button type="button" id="security-load-more" class="button button-secondary security-load-more" hidden>Показать ещё</button>
+      </section>
+    </section>
+
+    <section class="security-monitor-section public-security-section" aria-labelledby="public-monitor-title">
+      <div class="security-section-head">
+        <div><span class="eyebrow">Cloudflare edge</span><h2 id="public-monitor-title">kiananstudio.com</h2><p>Только запросы, которые Cloudflare отметил или обработал как события безопасности. Обычный трафик и IP обычных посетителей не записываются.</p></div>
+        <div class="security-live-status" id="public-security-live-status" data-level="loading">
+          <span class="security-status-dot" aria-hidden="true"></span>
+          <div><strong id="public-security-status-title">Загрузка…</strong><span id="public-security-status-note">Проверяю архив Cloudflare Security Events.</span></div>
+        </div>
+      </div>
+
+      <div class="security-collector-note" id="public-security-collector">Состояние сборщика: проверка…</div>
+
+      <section class="security-summary" aria-label="Сводка публичного сайта">
+        <article><span>Security Events</span><strong id="public-security-total-events">—</strong></article>
+        <article><span>Уникальные IP</span><strong id="public-security-unique-ips">—</strong></article>
+        <article><span>Block / Challenge</span><strong id="public-security-mitigated">—</strong></article>
+        <article><span>Источники защиты</span><strong id="public-security-services">—</strong></article>
+      </section>
+
+      <section class="security-breakdowns public-security-breakdowns">
+        <article class="security-panel"><div class="security-panel-head"><strong>Действия Cloudflare</strong><span>Block, challenge, log и другие</span></div><div id="public-security-actions" class="security-ranking"></div></article>
+        <article class="security-panel"><div class="security-panel-head"><strong>Тип защиты</strong><span>WAF, DDoS и другие источники</span></div><div id="public-security-sources" class="security-ranking"></div></article>
+        <article class="security-panel"><div class="security-panel-head"><strong>Страны</strong><span>Источники событий</span></div><div id="public-security-countries" class="security-ranking"></div></article>
+        <article class="security-panel"><div class="security-panel-head"><strong>IP-адреса</strong><span>Самые активные источники</span></div><div id="public-security-ips" class="security-ranking"></div></article>
+        <article class="security-panel security-panel-wide"><div class="security-panel-head"><strong>Адреса публичного сайта</strong><span>Какие пути чаще всего вызывали защиту</span></div><div id="public-security-paths" class="security-ranking"></div></article>
+      </section>
+
+      <section class="security-panel security-events-panel">
+        <div class="security-panel-head security-events-head">
+          <div><strong>Cloudflare Security Events</strong><span id="public-security-events-caption">Последние события выбранного периода</span></div>
+          <span class="security-generated" id="public-security-generated"></span>
+        </div>
+        <div id="public-security-events" class="security-events"></div>
+        <button type="button" id="public-security-load-more" class="button button-secondary security-load-more" hidden>Показать ещё</button>
+      </section>
     </section>
 
     <section class="security-privacy-note">
       <strong>Что намеренно не сохраняется</strong>
-      <p>Журнал не сохраняет пароли, Authorization-заголовки, cookies, содержимое запросов и query-параметры URL. Похожие на токены длинные сегменты пути автоматически заменяются на [redacted]. Сохраняются только технические метаданные, нужные для расследования: IP, география/ASN Cloudflare, безопасно обработанный путь, метод, тип события, причина блокировки, User-Agent, Ray ID и время.</p>
+      <p>Bibika не сохраняет пароли, Authorization-заголовки, cookies, содержимое запросов и query-параметры URL. Похожие на токены длинные сегменты пути автоматически заменяются на [redacted].</p>
+      <p>Публичный монитор также не ведёт журнал обычных посетителей. Collector получает только Cloudflare Security Events и намеренно не запрашивает query string или содержимое запросов. В D1 сохраняются только данные, нужные для расследования: время, действие Cloudflare, источник защиты, IP, страна, ASN, hostname, безопасно обработанный путь, описание правила и User-Agent.</p>
       <p id="security-retention"></p>
+      <p id="public-security-retention"></p>
     </section>
   </main>
 
