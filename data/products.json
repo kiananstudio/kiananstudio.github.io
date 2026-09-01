@@ -25,7 +25,7 @@
       "version": "1.0.0",
       "shortDescription": "Generate practical colliders for complex 3D meshes directly inside the Unity Editor.",
       "description": "3D Collider is a Unity Editor tool for generating colliders from complex meshes. In non-convex mode it creates surface-based MeshCollider geometry that can preserve openings, holes, tunnels and passages. In Convex mode it creates closed convex MeshColliders generated from the model surface for Rigidbody workflows.",
-      "href": "product.html?id=3d-collider",
+      "href": "page.html?page=3d-collider",
       "cover": "assets/images/3d-collider-cover.webp",
       "gallery": [
         "assets/images/3d-collider-unity.webp"
@@ -72,7 +72,7 @@
       "version": "",
       "shortDescription": "Create and edit 3D geometry directly inside Unity.",
       "description": "An in-Editor 3D modeling workflow being developed by Kianan Studio.",
-      "href": "product.html?id=3deditor",
+      "href": "page.html?page=3deditor",
       "cover": "",
       "gallery": [],
       "features": [],
@@ -128,6 +128,76 @@
     ]
   },
   "sitePages": [
+    {
+      "id": "3d-collider",
+      "title": "3D Collider",
+      "type": "text",
+      "heading": "3D Collider",
+      "content": "Generate practical colliders for complex 3D meshes directly inside the Unity Editor.",
+      "cards": [],
+      "blocks": [
+        {
+          "type": "image",
+          "image": "assets/images/3d-collider-cover.webp",
+          "alt": "3D Collider cover"
+        },
+        {
+          "type": "text",
+          "heading": "About",
+          "content": "3D Collider is a Unity Editor tool for generating colliders from complex meshes. In non-convex mode it creates surface-based MeshCollider geometry that can preserve openings, holes, tunnels and passages. In Convex mode it creates closed convex MeshColliders generated from the model surface for Rigidbody workflows.",
+          "buttonPosition": "side",
+          "buttons": []
+        },
+        {
+          "type": "text",
+          "heading": "Features",
+          "content": "Surface-based MeshCollider generation for static geometry\n\nPreserves important openings, holes, tunnels and passages\n\nClosed convex MeshColliders generated from the model surface for Rigidbody workflows\n\nAdjustable Accuracy with real-time Editor preview\n\nClosed-mesh validation for Convex generation\n\nBuilt-in, URP and HDRP compatible\n\nTested on macOS and Windows\n\nNo external package dependencies",
+          "buttonPosition": "side",
+          "buttons": []
+        },
+        {
+          "type": "text",
+          "heading": "Specifications",
+          "content": "Unity: 2022.3+\n\nPlatforms tested: macOS · Windows\n\nRender pipelines: Built-in · URP · HDRP\n\nSource: Full C# source included",
+          "buttonPosition": "side",
+          "buttons": []
+        },
+        {
+          "type": "image",
+          "image": "assets/images/3d-collider-unity.webp",
+          "alt": "3D Collider screenshot"
+        }
+      ],
+      "files": [],
+      "buttonPosition": "side",
+      "buttons": [
+        {
+          "label": "View on Unity Asset Store",
+          "href": "https://assetstore.unity.com/packages/slug/398482",
+          "style": "primary"
+        }
+      ]
+    },
+    {
+      "id": "3deditor",
+      "title": "3DEditor",
+      "type": "text",
+      "heading": "3DEditor",
+      "content": "Create and edit 3D geometry directly inside Unity.",
+      "cards": [],
+      "blocks": [
+        {
+          "type": "text",
+          "heading": "About",
+          "content": "An in-Editor 3D modeling workflow being developed by Kianan Studio.",
+          "buttonPosition": "side",
+          "buttons": []
+        }
+      ],
+      "files": [],
+      "buttonPosition": "side",
+      "buttons": []
+    },
     {
       "id": "bronchoscopy",
       "title": "Bronchoscopy",
