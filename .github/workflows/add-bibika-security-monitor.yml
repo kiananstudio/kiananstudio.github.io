@@ -1,0 +1,46 @@
+name: Add Bibika Security Monitor
+
+on:
+  push:
+    branches: [bibika-admin-v1]
+    paths:
+      - .github/workflows/add-bibika-security-monitor.yml
+      - .github/security_monitor_patch.py
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bibika-admin-v1
+
+      - name: Patch Worker security telemetry
+        run: python .github/security_monitor_patch.py
+
+      - name: Refresh Bibika navigation cache token
+        shell: python
+        run: |
+          from pathlib import Path
+          for p in Path('bibika').glob('*.html'):
+              s = p.read_text()
+              s = s.replace('bibika-navigation.js?v=1', 'bibika-navigation.js?v=2')
+              p.write_text(s)
+
+      - name: Check JavaScript
+        run: |
+          node --check bibika/security.js
+          node --check bibika/bibika-navigation.js
+          cp bibika/_worker.js /tmp/bibika-worker.mjs
+          node --check /tmp/bibika-worker.mjs
+
+      - name: Commit Security Monitor
+        run: |
+          git config user.name "kiananstudio"
+          git config user.email "konan1517@gmail.com"
+          git add bibika/_worker.js bibika/*.html
+          git commit -m "Add protected Security Monitor to Bibika" || true
+          git push origin bibika-admin-v1
