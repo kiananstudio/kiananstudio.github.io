@@ -18,6 +18,7 @@
   let activeHrefInput = null;
   let pendingIconRow = null;
   const sessionUploads = new Set();
+  const removedProductImages = new Set();
 
   const q = (selector, root = document) => root.querySelector(selector);
   const qa = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -180,7 +181,7 @@
       <div class="category-page-product-actions">
         <button type="button" class="category-page-product-action category-page-product-up" title="Переместить выше">↑</button>
         <button type="button" class="category-page-product-action category-page-product-down" title="Переместить ниже">↓</button>
-        ${product.__new ? '<button type="button" class="category-page-product-action category-page-product-remove" title="Убрать новый продукт">×</button>' : ''}
+        <button type="button" class="category-page-product-action category-page-product-remove" title="Удалить продукт">Удалить</button>
       </div>`;
 
     q('.category-page-product-title', row).value = product.title || '';
@@ -336,6 +337,7 @@
       catalog = await fetchCatalog();
       category = (catalog.categories || []).find(item => item.id === categoryId) || null;
       workingProducts = clone((catalog.products || []).filter(item => item.category === categoryId)).map(item => normalizeProduct(item, false));
+      removedProductImages.clear();
       if (announce) showToast('Страница категории обновлена из GitHub.');
     } catch (error) {
       showToast(`Не удалось загрузить категорию: ${error.message}`, 4500);
@@ -398,16 +400,36 @@
     renderProductRows();
   }
 
-  function removeNewProduct(key) {
+  function productImagePaths(product) {
+    return [
+      String(product?.icon || '').trim(),
+      String(product?.cover || '').trim(),
+      ...(Array.isArray(product?.gallery) ? product.gallery.map(item => String(item || '').trim()) : [])
+    ].filter(Boolean);
+  }
+
+  function removeProduct(key) {
     syncWorkingFromRows();
     const product = workingProducts.find(item => item.__key === key);
-    if (!product?.__new) return;
-    if (sessionUploads.has(product.icon)) {
-      sessionUploads.delete(product.icon);
-      cleanupPaths([product.icon]);
+    if (!product) return;
+
+    const name = String(product.title || product.id || 'этот продукт');
+    if (!product.__new && !confirm(`Удалить продукт «${name}» из этой категории и с сайта? Удаление произойдёт после нажатия «Сохранить».`)) return;
+
+    const images = productImagePaths(product);
+    if (product.__new) {
+      const temporary = images.filter(path => sessionUploads.has(path));
+      temporary.forEach(path => sessionUploads.delete(path));
+      if (temporary.length) cleanupPaths(temporary);
+    } else {
+      images.forEach(path => removedProductImages.add(path));
     }
+
     workingProducts = workingProducts.filter(item => item.__key !== key);
     renderProductRows();
+    setState(product.__new
+      ? 'Новый продукт убран из списка.'
+      : `Продукт «${name}» будет удалён после нажатия «Сохранить».`);
   }
 
   function validateSourceFile(file) {
@@ -592,6 +614,9 @@
       if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
 
       sessionUploads.clear();
+      const obsoleteImages = [...removedProductImages];
+      removedProductImages.clear();
+      if (obsoleteImages.length) cleanupPaths(obsoleteImages);
       const visibleDescription = q('#category-description');
       if (visibleDescription) visibleDescription.textContent = latestCategory.description;
       setState('Страница категории и продукты сохранены и опубликованы.', 'ok');
@@ -665,7 +690,7 @@
       }
       if (event.target.closest('.category-page-product-remove')) {
         event.preventDefault();
-        removeNewProduct(row.dataset.productKey);
+        removeProduct(row.dataset.productKey);
       }
     });
 
