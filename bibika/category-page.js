@@ -32,6 +32,56 @@
     return href;
   }
 
+  function managedPageId(product) {
+    const href = String(product?.href || '').trim();
+    if (!href) return '';
+    try {
+      const url = new URL(href, `${PUBLIC_ORIGIN}/`);
+      if (!/\/page\.html$/i.test(url.pathname)) return '';
+      return String(url.searchParams.get('page') || '').trim();
+    } catch {
+      return '';
+    }
+  }
+
+  function latestProductFile(data, product) {
+    const pageId = managedPageId(product);
+    if (!pageId) return null;
+    const page = (Array.isArray(data?.sitePages) ? data.sitePages : []).find(item => String(item?.id || '') === pageId);
+    const files = Array.isArray(page?.files) ? page.files.filter(Boolean) : [];
+    if (!files.length) return null;
+    return [...files].sort((a, b) => {
+      const aTime = Date.parse(a?.uploadedAt || '') || 0;
+      const bTime = Date.parse(b?.uploadedAt || '') || 0;
+      return bTime - aTime;
+    })[0];
+  }
+
+  function productTargetBadge(data, product) {
+    const category = String(product?.category || '').trim();
+    if (category === 'unity-tools' || category === '3d-assets') return 'UNITY ASSET STORE';
+
+    const file = latestProductFile(data, product);
+    if (!file) return '';
+    const fileName = String(file.fileName || '').trim().toLowerCase();
+    if (/\.(apk|aab)$/.test(fileName)) return 'ANDROID';
+    if (/\.(exe|msi)$/.test(fileName)) return 'Windows';
+    if (/\.(dmg|pkg)$/.test(fileName)) return 'macOS';
+
+    const platform = String(file.platform || file.uploadedPlatform || '').trim().toLowerCase();
+    if (platform === 'android') return 'ANDROID';
+    if (platform === 'windows') return 'Windows';
+    if (platform === 'macos') return 'macOS';
+    return '';
+  }
+
+  function productVersionBadge(data, product) {
+    const direct = String(product?.version || '').trim();
+    if (direct) return direct;
+    const file = latestProductFile(data, product);
+    return String(file?.version || file?.uploadedVersion || '').trim();
+  }
+
   fetch(`${API_URL}?t=${Date.now()}`, { cache: 'no-store', credentials: 'same-origin' })
     .then(r => {
       if (!r.ok) throw new Error(`Catalog load failed: ${r.status}`);
@@ -61,10 +111,13 @@
         } else {
           visual = `<div class="item-placeholder">${escapeHtml(product.title.slice(0,2).toUpperCase())}</div>`;
         }
+
+        const targetBadge = productTargetBadge(data, product);
+        const versionBadge = productVersionBadge(data, product);
         return `<a class="catalog-item" href="${escapeHtml(safeHref(product))}">
           <div class="catalog-thumb">${visual}</div>
           <div class="catalog-item-copy">
-            <div class="catalog-meta">${product.status ? `<span>${escapeHtml(product.status)}</span>` : ''}${product.version ? `<span>v${escapeHtml(product.version)}</span>` : ''}</div>
+            <div class="catalog-meta">${targetBadge ? `<span>${escapeHtml(targetBadge)}</span>` : ''}${versionBadge ? `<span>V${escapeHtml(versionBadge)}</span>` : ''}</div>
             <h4>${escapeHtml(product.title)}</h4>
             <p>${escapeHtml(product.shortDescription || '')}</p>
           </div>
