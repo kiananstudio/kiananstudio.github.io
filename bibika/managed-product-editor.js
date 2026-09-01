@@ -56,9 +56,16 @@
     const button = q('#text-page-add-file-block');
     const host = q('#text-page-file-blocks');
     const empty = q('#text-page-file-blocks-empty');
-    if (button) button.hidden = !visible;
-    if (host) host.hidden = !visible;
-    if (empty) empty.hidden = !visible || !!host?.children.length;
+    if (button && button.hidden === visible) button.hidden = !visible;
+    if (host && host.hidden === visible) host.hidden = !visible;
+    const hideEmpty = !visible || !!host?.children.length;
+    if (empty && empty.hidden !== hideEmpty) empty.hidden = hideEmpty;
+  }
+
+  function keepAssetMode() {
+    if (!q('#header-page-create-overlay')?.classList.contains('open')) return;
+    const id = currentId();
+    if (productFor(catalogCache, id)) setFileControlsVisible(false);
   }
 
   function fill(product, id) {
@@ -66,6 +73,8 @@
     if (!section) return;
     section.hidden = false;
     setFileControlsVisible(false);
+    setTimeout(keepAssetMode, 60);
+    setTimeout(keepAssetMode, 180);
     if (section.dataset.loadedId === id) return;
     section.dataset.loadedId = id;
     q('#managed-product-version').value = String(product?.version || '');
