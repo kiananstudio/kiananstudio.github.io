@@ -40,6 +40,7 @@
 
       addLabels(panel, product);
       const firstImage = q('.managed-page-image-block', host);
+      if (product?.cover && !firstImage && attempts < 60) return;
       if (product?.cover && firstImage) {
         const img = q('img', firstImage);
         const expected = String(product.cover || '').replace(/^\/+/, '');
