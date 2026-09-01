@@ -869,7 +869,7 @@ async function handleRequest(request, env) {
   const contentType = response.headers.get("Content-Type") || "";
   if (contentType.includes("text/html")) {
     const html = await response.text();
-    const additions = `<script defer src="/image-editor.js?v=1"></script><script defer src="/image-cleanup.js?v=1"></script><script defer src="/text-page-files.js?v=1"></script><script defer src="/text-page-blocks.js?v=1"></script><script defer src="/publish-hotfix.js?v=1"></script>`;
+    const additions = `<script defer src="/image-editor.js?v=1"></script><script defer src="/image-cleanup.js?v=1"></script><script defer src="/text-page-files.js?v=1"></script><script defer src="/text-page-blocks.js?v=2"></script><script defer src="/publish-hotfix.js?v=1"></script>`;
     const patched = html.includes("</body>") ? html.replace("</body>", `${additions}</body>`) : `${html}${additions}`;
     return new Response(patched, { status: response.status, statusText: response.statusText, headers });
   }

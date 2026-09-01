@@ -709,6 +709,12 @@
       const response = await fetch(`${API_URL}?t=${Date.now()}`, { cache: 'no-store', credentials: 'same-origin' });
       if (!response.ok) return;
       const data = await response.json();
+      const product = (Array.isArray(data?.products) ? data.products : []).find(item => String(item?.id || '').toLowerCase() === id);
+      if (product && (String(product.category || '') === 'unity-tools' || String(product.category || '') === '3d-assets')) {
+        const host = q('#managed-page-content');
+        if (host) qa('.managed-extra-block', host).forEach(node => node.remove());
+        return;
+      }
       const page = (Array.isArray(data?.sitePages) ? data.sitePages : []).find(item => String(item?.id || '').toLowerCase() === id);
       if (!page || page.type === 'categories') return;
       const blocks = normalizeBlocks(page);
