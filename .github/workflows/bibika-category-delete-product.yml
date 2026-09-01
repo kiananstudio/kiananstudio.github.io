@@ -1,0 +1,87 @@
+name: Bibika category product delete patch
+
+on:
+  push:
+    branches: [bibika-admin-v1]
+    paths:
+      - .github/workflows/bibika-category-delete-product.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bibika-admin-v1
+
+      - name: Add delete controls for products
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('bibika/category-page-editor.js')
+          s = p.read_text()
+
+          old = "  const sessionUploads = new Set();\n"
+          new = "  const sessionUploads = new Set();\n  const removedProductImages = new Set();\n"
+          if old not in s:
+              raise SystemExit('sessionUploads marker not found')
+          s = s.replace(old, new, 1)
+
+          old = "        ${product.__new ? '<button type=\"button\" class=\"category-page-product-action category-page-product-remove\" title=\"Убрать новый продукт\">×</button>' : ''}\n"
+          new = "        <button type=\"button\" class=\"category-page-product-action category-page-product-remove\" title=\"Удалить продукт\">Удалить</button>\n"
+          if old not in s:
+              raise SystemExit('row delete button marker not found')
+          s = s.replace(old, new, 1)
+
+          old = "      workingProducts = clone((catalog.products || []).filter(item => item.category === categoryId)).map(item => normalizeProduct(item, false));\n"
+          new = "      workingProducts = clone((catalog.products || []).filter(item => item.category === categoryId)).map(item => normalizeProduct(item, false));\n      removedProductImages.clear();\n"
+          if old not in s:
+              raise SystemExit('load products marker not found')
+          s = s.replace(old, new, 1)
+
+          old = '''  function removeNewProduct(key) {\n    syncWorkingFromRows();\n    const product = workingProducts.find(item => item.__key === key);\n    if (!product?.__new) return;\n    if (sessionUploads.has(product.icon)) {\n      sessionUploads.delete(product.icon);\n      cleanupPaths([product.icon]);\n    }\n    workingProducts = workingProducts.filter(item => item.__key !== key);\n    renderProductRows();\n  }\n'''
+          new = '''  function productImagePaths(product) {\n    return [\n      String(product?.icon || '').trim(),\n      String(product?.cover || '').trim(),\n      ...(Array.isArray(product?.gallery) ? product.gallery.map(item => String(item || '').trim()) : [])\n    ].filter(Boolean);\n  }\n\n  function removeProduct(key) {\n    syncWorkingFromRows();\n    const product = workingProducts.find(item => item.__key === key);\n    if (!product) return;\n\n    const name = String(product.title || product.id || 'этот продукт');\n    if (!product.__new && !confirm(`Удалить продукт «${name}» из этой категории и с сайта? Удаление произойдёт после нажатия «Сохранить».`)) return;\n\n    const images = productImagePaths(product);\n    if (product.__new) {\n      const temporary = images.filter(path => sessionUploads.has(path));\n      temporary.forEach(path => sessionUploads.delete(path));\n      if (temporary.length) cleanupPaths(temporary);\n    } else {\n      images.forEach(path => removedProductImages.add(path));\n    }\n\n    workingProducts = workingProducts.filter(item => item.__key !== key);\n    renderProductRows();\n    setState(product.__new\n      ? 'Новый продукт убран из списка.'\n      : `Продукт «${name}» будет удалён после нажатия «Сохранить».`);\n  }\n'''
+          if old not in s:
+              raise SystemExit('removeNewProduct function not found')
+          s = s.replace(old, new, 1)
+
+          old = "      sessionUploads.clear();\n      const visibleDescription = q('#category-description');\n"
+          new = "      sessionUploads.clear();\n      const obsoleteImages = [...removedProductImages];\n      removedProductImages.clear();\n      if (obsoleteImages.length) cleanupPaths(obsoleteImages);\n      const visibleDescription = q('#category-description');\n"
+          if old not in s:
+              raise SystemExit('save cleanup marker not found')
+          s = s.replace(old, new, 1)
+
+          old = "        removeNewProduct(row.dataset.productKey);\n"
+          new = "        removeProduct(row.dataset.productKey);\n"
+          if old not in s:
+              raise SystemExit('remove binding marker not found')
+          s = s.replace(old, new, 1)
+
+          p.write_text(s)
+
+          p = Path('bibika/category-page-editor.css')
+          s = p.read_text()
+          old = ".category-page-product-remove{color:#ffc1c5;border-color:rgba(255,100,110,.22)}"
+          new = ".category-page-product-remove{min-width:74px;color:#ffc1c5;border-color:rgba(255,100,110,.28);background:rgba(120,24,34,.12)}.category-page-product-remove:hover:not(:disabled){border-color:rgba(255,100,110,.58);background:rgba(150,30,42,.2)}"
+          if old not in s:
+              raise SystemExit('delete css marker not found')
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('bibika/category.html')
+          s = p.read_text().replace('category-page-editor.css?v=4', 'category-page-editor.css?v=5').replace('category-page-editor.js?v=4', 'category-page-editor.js?v=5')
+          p.write_text(s)
+
+      - name: Check JavaScript
+        run: node --check bibika/category-page-editor.js
+
+      - name: Commit patch
+        run: |
+          git config user.name "kiananstudio"
+          git config user.email "konan1517@gmail.com"
+          git add bibika/category-page-editor.js bibika/category-page-editor.css bibika/category.html
+          git commit -m "Add delete button to category products"
+          git push origin bibika-admin-v1
