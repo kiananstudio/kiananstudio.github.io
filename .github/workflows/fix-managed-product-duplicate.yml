@@ -1,0 +1,61 @@
+name: Fix managed product duplicate blocks
+
+on:
+  push:
+    branches: [bibika-admin-v1]
+    paths:
+      - .github/workflows/fix-managed-product-duplicate.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bibika-admin-v1
+
+      - name: Disable legacy preview renderer for managed Asset Store products
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('bibika/text-page-blocks.js')
+          s = p.read_text()
+          old = """      const data = await response.json();
+      const page = (Array.isArray(data?.sitePages) ? data.sitePages : []).find(item => String(item?.id || '').toLowerCase() === id);
+      if (!page || page.type === 'categories') return;
+"""
+          new = """      const data = await response.json();
+      const product = (Array.isArray(data?.products) ? data.products : []).find(item => String(item?.id || '').toLowerCase() === id);
+      if (product && (String(product.category || '') === 'unity-tools' || String(product.category || '') === '3d-assets')) {
+        const host = q('#managed-page-content');
+        if (host) qa('.managed-extra-block', host).forEach(node => node.remove());
+        return;
+      }
+      const page = (Array.isArray(data?.sitePages) ? data.sitePages : []).find(item => String(item?.id || '').toLowerCase() === id);
+      if (!page || page.type === 'categories') return;
+"""
+          if old not in s:
+              raise SystemExit('preview marker not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          p = Path('bibika/_worker.js')
+          s = p.read_text().replace('/text-page-blocks.js?v=1', '/text-page-blocks.js?v=2')
+          p.write_text(s)
+
+      - name: Check JavaScript
+        run: |
+          node --check bibika/text-page-blocks.js
+          node --check bibika/managed-product-page.js
+
+      - name: Commit fix
+        run: |
+          git config user.name "kiananstudio"
+          git config user.email "konan1517@gmail.com"
+          git add bibika/text-page-blocks.js bibika/_worker.js
+          git commit -m "Prevent duplicate managed product blocks in Bibika" || true
+          git push origin bibika-admin-v1
