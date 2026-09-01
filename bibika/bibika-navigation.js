@@ -25,6 +25,40 @@
     return `${path}${url.search}${url.hash}`;
   }
 
+  function ensureSecurityButton() {
+    const actions = document.querySelector('.bibika-actions');
+    if (!actions || document.getElementById('bibika-security-status')) return;
+
+    const link = document.createElement('a');
+    link.className = 'button button-secondary bibika-security-status';
+    link.id = 'bibika-security-status';
+    link.href = '/security.html';
+    link.textContent = '⚪ Безопасность';
+    link.dataset.level = 'loading';
+    actions.appendChild(link);
+
+    const refresh = async () => {
+      try {
+        const response = await fetch('/api/security?period=day&limit=0&offset=0', {
+          cache: 'no-store',
+          credentials: 'same-origin'
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const level = ['green', 'yellow', 'red'].includes(data?.status?.level) ? data.status.level : 'green';
+        link.dataset.level = level;
+        link.textContent = `${level === 'red' ? '🔴' : level === 'yellow' ? '🟡' : '🟢'} Безопасность`;
+        link.title = data?.status?.note || 'Открыть журнал безопасности';
+      } catch {
+        link.dataset.level = 'loading';
+        link.textContent = '⚪ Безопасность';
+      }
+    };
+
+    refresh();
+    setInterval(refresh, 60000);
+  }
+
   function ensureLogoutButton() {
     const actions = document.querySelector('.bibika-actions');
     if (!actions || document.getElementById('bibika-logout')) return;
@@ -49,9 +83,6 @@
           console.error('Bibika logout request failed', error);
         });
       } finally {
-        // Leave the protected origin immediately. This prevents the browser
-        // from challenging for Basic Auth again after Clear-Site-Data removes
-        // the cached HTTP credentials from the logout response.
         window.location.replace(PUBLIC_ORIGIN + '/');
       }
     });
@@ -59,6 +90,7 @@
     actions.appendChild(button);
   }
 
+  ensureSecurityButton();
   ensureLogoutButton();
 
   document.addEventListener('click', (event) => {
