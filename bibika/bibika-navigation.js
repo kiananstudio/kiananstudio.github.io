@@ -37,18 +37,31 @@
     link.dataset.level = 'loading';
     actions.appendChild(link);
 
+    const rank = { gray: 0, green: 1, yellow: 2, red: 3 };
+    const normalize = value => ['green', 'yellow', 'red', 'gray'].includes(value) ? value : 'gray';
+
     const refresh = async () => {
       try {
-        const response = await fetch('/api/security?period=day&limit=0&offset=0', {
-          cache: 'no-store',
-          credentials: 'same-origin'
-        });
-        if (!response.ok) return;
-        const data = await response.json();
-        const level = ['green', 'yellow', 'red'].includes(data?.status?.level) ? data.status.level : 'green';
+        const [bibikaResult, publicResult] = await Promise.allSettled([
+          fetch('/api/security?period=day&limit=0&offset=0', { cache: 'no-store', credentials: 'same-origin' }),
+          fetch('/api/security/public?period=day&limit=0&offset=0', { cache: 'no-store', credentials: 'same-origin' })
+        ]);
+
+        const statuses = [];
+        const notes = [];
+        for (const result of [bibikaResult, publicResult]) {
+          if (result.status !== 'fulfilled' || !result.value.ok) continue;
+          const data = await result.value.json().catch(() => ({}));
+          const level = normalize(data?.status?.level);
+          statuses.push(level);
+          if (data?.status?.note) notes.push(String(data.status.note));
+        }
+        if (!statuses.length) throw new Error('Security status unavailable');
+
+        const level = statuses.reduce((worst, current) => rank[current] > rank[worst] ? current : worst, 'gray');
         link.dataset.level = level;
-        link.textContent = `${level === 'red' ? '🔴' : level === 'yellow' ? '🟡' : '🟢'} Безопасность`;
-        link.title = data?.status?.note || 'Открыть журнал безопасности';
+        link.textContent = `${level === 'red' ? '🔴' : level === 'yellow' ? '🟡' : level === 'green' ? '🟢' : '⚪'} Безопасность`;
+        link.title = notes.join(' | ') || 'Открыть журнал безопасности';
       } catch {
         link.dataset.level = 'loading';
         link.textContent = '⚪ Безопасность';
