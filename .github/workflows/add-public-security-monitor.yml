@@ -1,0 +1,30 @@
+name: Add public site security monitor
+
+on:
+  push:
+    branches: [bibika-admin-v1]
+    paths:
+      - .github/workflows/add-public-security-monitor.yml
+      - .github/public_security_patch.py
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bibika-admin-v1
+      - name: Patch Bibika worker
+        run: python .github/public_security_patch.py
+      - name: Check Worker JavaScript
+        run: node --check bibika/_worker.js
+      - name: Commit monitor backend
+        run: |
+          git config user.name "kiananstudio"
+          git config user.email "konan1517@gmail.com"
+          git add bibika/_worker.js
+          git commit -m "Add public site security monitor backend" || true
+          git push origin bibika-admin-v1
