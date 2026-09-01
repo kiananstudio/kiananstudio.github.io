@@ -1,8 +1,0 @@
-from pathlib import Path
-
-p = Path('bibika/security.css')
-s = p.read_text()
-marker = '.security-monitor-section{'
-if marker not in s:
-    s += '''\n.security-heading-main{margin-bottom:18px}.security-monitor-section{margin-top:18px;padding-top:24px;border-top:1px solid rgba(255,255,255,.08)}.security-monitor-section:first-of-type{border-top:0}.security-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:28px;margin-bottom:18px}.security-section-head>div:first-child{min-width:0}.security-section-head h2{font-size:clamp(1.6rem,3vw,2.45rem);margin:6px 0 8px}.security-section-head p{max-width:720px;color:var(--muted);margin:0}.security-live-status[data-level="gray"] .security-status-dot,.security-live-status[data-level="loading"] .security-status-dot{background:#83909c;box-shadow:0 0 0 5px rgba(131,144,156,.1)}.public-security-section{margin-top:42px}.security-collector-note{margin:0 0 16px;padding:11px 13px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);color:var(--muted);font-size:.84rem}.security-collector-note[data-state="ok"]{border-color:rgba(52,211,153,.2);color:#b9e8d5}.security-collector-note[data-state="waiting"]{border-color:rgba(251,191,36,.2);color:#ead9a6}.security-panel-wide{grid-column:1/-1}.bibika-security-status[data-level="gray"],.bibika-security-status[data-level="loading"]{border-color:rgba(131,144,156,.3)}\n@media(max-width:900px){.security-section-head{flex-direction:column}.security-section-head .security-live-status{width:100%;min-width:0}.security-panel-wide{grid-column:1}}\n'''
-p.write_text(s)
