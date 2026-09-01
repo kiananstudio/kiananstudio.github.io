@@ -1,0 +1,207 @@
+name: Unify managed product pages
+
+on:
+  push:
+    branches: [bibika-admin-v1]
+    paths:
+      - .github/workflows/unify-managed-product-pages.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bibika-admin-v1
+          fetch-depth: 0
+
+      - name: Patch Bibika managed product flow
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('bibika/page.html')
+          s = p.read_text()
+          if 'managed-product.css?v=1' not in s:
+              s = s.replace('  <link rel="stylesheet" href="bibika-page-mirror.css?v=2" />\n', '  <link rel="stylesheet" href="bibika-page-mirror.css?v=2" />\n  <link rel="stylesheet" href="managed-product.css?v=1" />\n')
+          if 'managed-product-page.js?v=1' not in s:
+              s = s.replace('  <script defer src="managed-page.js?v=3"></script>\n', '  <script defer src="managed-page.js?v=3"></script>\n  <script defer src="managed-product-page.js?v=1"></script>\n  <script defer src="managed-product-editor.js?v=1"></script>\n')
+          p.write_text(s)
+
+          p = Path('bibika/category-page-editor.js')
+          s = p.read_text()
+          marker = "  const ALLOWED_EXTENSIONS = /\\.(webp|png|jpe?g)$/i;\n"
+          if 'MANAGED_PRODUCT_CATEGORIES' not in s:
+              if marker not in s:
+                  raise SystemExit('category constants marker not found')
+              s = s.replace(marker, marker + "  const MANAGED_PRODUCT_CATEGORIES = new Set(['unity-tools', '3d-assets']);\n", 1)
+
+          old = "    const href = String(product.href || '').trim();\n    const hrefError = validateHref(href);\n"
+          new = "    let href = String(product.href || '').trim();\n    const managedPage = MANAGED_PRODUCT_CATEGORIES.has(categoryId);\n    if (!href && managedPage) href = '__managed_product__';\n    const hrefError = managedPage ? '' : validateHref(href);\n"
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif 'const managedPage = MANAGED_PRODUCT_CATEGORIES.has(categoryId);' not in s:
+              raise SystemExit('build product href marker not found')
+
+          old = "      latest.href = href;\n      latest.category = categoryId;\n"
+          new = "      latest.href = managedPage ? `page.html?page=${encodeURIComponent(latest.id)}` : href;\n      latest.category = categoryId;\n"
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          old = "      shortDescription: String(product.shortDescription || '').trim(), description: '', href,\n"
+          new = "      shortDescription: String(product.shortDescription || '').trim(), description: '',\n      href: managedPage ? `page.html?page=${encodeURIComponent(id)}` : href,\n"
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          insertion = """
+  function syncManagedProductPages(data, beforeProducts) {
+    if (!MANAGED_PRODUCT_CATEGORIES.has(categoryId)) return;
+    const previousIds = new Set((beforeProducts || [])
+      .filter(item => String(item?.category || '') === categoryId)
+      .map(item => String(item?.id || '').trim().toLowerCase())
+      .filter(Boolean));
+    const products = (Array.isArray(data?.products) ? data.products : [])
+      .filter(item => String(item?.category || '') === categoryId);
+    const currentIds = new Set(products.map(item => String(item?.id || '').trim().toLowerCase()).filter(Boolean));
+    let pages = Array.isArray(data?.sitePages) ? data.sitePages : [];
+
+    pages = pages.filter(page => {
+      const id = String(page?.id || '').trim().toLowerCase();
+      return !(previousIds.has(id) && !currentIds.has(id));
+    });
+
+    products.forEach(product => {
+      const id = String(product?.id || '').trim().toLowerCase();
+      if (!id) return;
+      product.href = `page.html?page=${encodeURIComponent(id)}`;
+      if (pages.some(page => String(page?.id || '').trim().toLowerCase() === id)) return;
+      const storeUrl = String(product?.links?.primaryUrl || '').trim();
+      pages.unshift({
+        id,
+        title: String(product?.title || id).trim(),
+        type: 'text',
+        heading: String(product?.title || id).trim(),
+        content: String(product?.shortDescription || '').trim(),
+        cards: [],
+        blocks: [],
+        files: [],
+        buttonPosition: 'side',
+        buttons: storeUrl ? [{ label: 'View on Unity Asset Store', href: storeUrl, style: 'primary' }] : []
+      });
+    });
+    data.sitePages = pages;
+  }
+
+"""
+          marker = "  async function save() {\n"
+          if 'function syncManagedProductPages' not in s:
+              if marker not in s:
+                  raise SystemExit('save function marker not found')
+              s = s.replace(marker, insertion + marker, 1)
+
+          old = "      latestCategory.description = q('#category-page-description-input')?.value.trim() || '';\n      latest.products = mergeWorkingProducts(Array.isArray(latest.products) ? latest.products : []);\n"
+          new = "      latestCategory.description = q('#category-page-description-input')?.value.trim() || '';\n      const beforeProducts = Array.isArray(latest.products) ? latest.products.map(item => ({ ...item })) : [];\n      latest.products = mergeWorkingProducts(Array.isArray(latest.products) ? latest.products : []);\n      syncManagedProductPages(latest, beforeProducts);\n"
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif 'syncManagedProductPages(latest, beforeProducts);' not in s:
+              raise SystemExit('save merge marker not found')
+          p.write_text(s)
+
+          p = Path('bibika/category.html')
+          s = p.read_text().replace('category-page-editor.js?v=6', 'category-page-editor.js?v=7')
+          p.write_text(s)
+
+      - name: Check Bibika JavaScript
+        run: |
+          node --check bibika/managed-product-editor.js
+          node --check bibika/managed-product-page.js
+          node --check bibika/category-page-editor.js
+
+      - name: Commit Bibika changes
+        run: |
+          git config user.name "kiananstudio"
+          git config user.email "konan1517@gmail.com"
+          git add bibika/page.html bibika/category.html bibika/category-page-editor.js bibika/managed-product-editor.js bibika/managed-product-page.js bibika/managed-product.css
+          git commit -m "Use managed page editor for Asset Store products" || true
+          git push origin bibika-admin-v1
+
+      - name: Patch public managed product pages
+        shell: bash
+        run: |
+          git fetch origin main
+          git switch main
+          git reset --hard origin/main
+          python <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path('page.html')
+          s = p.read_text()
+          if 'site-page-product.css?v=1' not in s:
+              s = s.replace('  <link rel="stylesheet" href="site-page-files.css?v=1" />\n', '  <link rel="stylesheet" href="site-page-files.css?v=1" />\n  <link rel="stylesheet" href="site-page-product.css?v=1" />\n')
+          if 'site-page-product.js?v=1' not in s:
+              s = s.replace('  <script defer src="site-page-files.js?v=2"></script>\n', '  <script defer src="site-page-files.js?v=2"></script>\n  <script defer src="site-page-product.js?v=1"></script>\n')
+          p.write_text(s)
+
+          data_path = Path('data/products.json')
+          data = json.loads(data_path.read_text())
+          products = data.setdefault('products', [])
+          pages = data.setdefault('sitePages', [])
+
+          def page_for(product):
+              blocks = []
+              cover = str(product.get('cover') or '').strip()
+              if cover:
+                  blocks.append({'type': 'image', 'image': cover, 'alt': f"{product.get('title','')} cover".strip()})
+              description = str(product.get('description') or '').strip()
+              if description:
+                  blocks.append({'type': 'text', 'heading': 'About', 'content': description, 'buttonPosition': 'side', 'buttons': []})
+              features = [str(x).strip() for x in (product.get('features') or []) if str(x).strip()]
+              if features:
+                  blocks.append({'type': 'text', 'heading': 'Features', 'content': '\n\n'.join(features), 'buttonPosition': 'side', 'buttons': []})
+              specs = []
+              for pair in product.get('specs') or []:
+                  if isinstance(pair, list) and len(pair) >= 2 and str(pair[0]).strip() and str(pair[1]).strip():
+                      specs.append(f"{str(pair[0]).strip()}: {str(pair[1]).strip()}")
+              if specs:
+                  blocks.append({'type': 'text', 'heading': 'Specifications', 'content': '\n\n'.join(specs), 'buttonPosition': 'side', 'buttons': []})
+              for image in product.get('gallery') or []:
+                  image = str(image or '').strip()
+                  if image:
+                      blocks.append({'type': 'image', 'image': image, 'alt': f"{product.get('title','')} screenshot".strip()})
+              url = str((product.get('links') or {}).get('primaryUrl') or '').strip()
+              return {
+                  'id': product['id'],
+                  'title': product.get('title') or product['id'],
+                  'type': 'text',
+                  'heading': product.get('title') or product['id'],
+                  'content': str(product.get('shortDescription') or '').strip(),
+                  'cards': [],
+                  'blocks': blocks,
+                  'files': [],
+                  'buttonPosition': 'side',
+                  'buttons': ([{'label': 'View on Unity Asset Store', 'href': url, 'style': 'primary'}] if url else [])
+              }
+
+          migrated = []
+          for product in products:
+              if product.get('id') not in ('3d-collider', '3deditor'):
+                  continue
+              product['href'] = f"page.html?page={product['id']}"
+              existing = next((page for page in pages if str(page.get('id') or '').lower() == product['id']), None)
+              if not existing:
+                  migrated.append(page_for(product))
+
+          if migrated:
+              pages[0:0] = migrated
+
+          data_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+          PY
+
+          node --check site-page-product.js
+          git add page.html site-page-product.js site-page-product.css data/products.json
+          git commit -m "Migrate Asset Store products to managed pages" || true
+          git push origin main
