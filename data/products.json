@@ -182,17 +182,22 @@
           "type": "image",
           "image": "assets/images/3d-collider-unity.webp",
           "alt": "KiananStudio 3D Collider in Unity"
+        },
+        {
+          "type": "image",
+          "image": "assets/images/3d-collider-page-20261027162421-3d91b27c.webp",
+          "alt": ""
         }
       ],
       "files": [],
-      "buttonPosition": "side",
       "buttons": [
         {
           "label": "View on Unity Asset Store",
           "href": "https://assetstore.unity.com/packages/slug/398482",
           "style": "primary"
         }
-      ]
+      ],
+      "buttonPosition": "side"
     },
     {
       "id": "3deditor",
